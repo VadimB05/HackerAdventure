@@ -1,4 +1,4 @@
-# 🕵️‍♂️ HackerAdventure INTRUSION – Hacker Adventure Game
+# 🕵️‍♂️ INTRUSION – Hacker Adventure Game
 
 **INTRUSION** ist ein webbasiertes Fullstack-Hacker-Adventure-Game, entwickelt mit **Next.js** und **MariaDB**. Spieler:innen tauchen ein in eine storybasierte Welt aus Code, Rätseln und Sicherheitsmechanismen. Das Spiel kombiniert Point-&-Click-Mechaniken, Terminal-Eingaben und Drag-&-Drop-Logik.
 
@@ -25,7 +25,7 @@
 | Admin-Editor| Webbasierte UI (Next.js) |
 | Testing     | Jest, React Testing Library, Supertest |
 | CI/CD       | GitHub Actions       |
-| Deployment  | Selfhosted    |
+| Deployment  | Lokal oder Vercel    |
 
 ---
 
@@ -72,3 +72,67 @@ DB_USER=root
 DB_PASSWORD=deinpasswort
 DB_NAME=intrusion
 JWT_SECRET=dein_supergeheimer_schlüssel
+```
+
+### 💻 Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Starte Entwicklungsserver
+npm run dev
+```
+
+> Hinweis: Vergiss nicht, die Datenbank mit dem SQL-Dump zu initialisieren!
+
+---
+
+## 🚦 Tests & CI
+
+### 📦 Tests ausführen
+
+```bash
+# Unit & Integrationstests
+npm run test
+```
+
+### 🔁 CI/CD mit GitHub Actions
+- Linting, Unit-Tests, Build
+- Optional: Deployment zu Vercel oder via SSH
+
+---
+
+## 🗃️ Projektstruktur (Auszug)
+
+```
+├── app/
+│   ├── login/...
+│   ├── game/...
+│   └── admin/...
+├── components/...
+├── pages/api/
+│   ├── auth/
+│   ├── game/
+│   └── admin/
+├── lib/db.ts
+├── intrusion_schema.sql
+├── README.md
+└── ...
+```
+
+---
+
+## 📚 Weiterentwicklung
+
+Geplant:
+- Erweiterbare Terminal-Logik
+- Missions-Fortschrittsanzeige
+- Item-Kombinationen & Kombinationserkennung
+- Logging & Analyse gelöster Rätsel
+
+---
+
+## 👥 Team
+
+- **Vadim Balysev** – Fullstack Entwicklung, Architektur, Datenmodell
