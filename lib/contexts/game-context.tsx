@@ -17,6 +17,7 @@ interface GameState {
   money: number;
   experiencePoints: number;
   level: number;
+  currentMission?: string | null;
 }
 
 interface GameContextType {
@@ -165,15 +166,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const startNewGame = async (): Promise<void> => {
     try {
-      const response = await fetch('/api/game/state/reset', {
+      const response = await fetch('/api/game/start', {
         method: 'POST',
         credentials: 'include'
       });
 
       if (response.ok) {
-        // Neuen Spielstand laden
-        await checkGameProgress();
+        const data = await response.json();
+        
+        // Spielstand im Context aktualisieren
+        setGameState(data.gameState);
+        setHasGameProgress(false); // Neues Spiel = kein Fortschritt
+        
         router.push('/game');
+      } else {
+        console.error('Failed to start new game');
       }
     } catch (error) {
       console.error('Start new game failed:', error);

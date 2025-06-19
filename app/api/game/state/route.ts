@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
         money: number;
         experience_points: number;
         level: number;
+        current_mission: string | null;
       }>(
-        'SELECT current_room, inventory, progress, money, experience_points, level FROM game_states WHERE user_id = ?',
+        'SELECT current_room, inventory, progress, money, experience_points, level, current_mission FROM game_states WHERE user_id = ?',
         [userId]
       );
 
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
         progress: JSON.parse(gameState.progress || '{}'),
         money: gameState.money,
         experiencePoints: gameState.experience_points,
-        level: gameState.level
+        level: gameState.level,
+        currentMission: gameState.current_mission
       };
 
       return NextResponse.json({
@@ -64,10 +66,10 @@ export async function PUT(request: NextRequest) {
   return requireAuth(async (req) => {
     try {
       const userId = req.user!.id;
-      const { currentRoom, inventory, progress, money, experiencePoints, level } = await request.json();
+      const { currentRoom, inventory, progress, money, experiencePoints, level, currentMission } = await request.json();
 
       await executeUpdate(
-        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ? WHERE user_id = ?',
+        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
         [
           currentRoom,
           JSON.stringify(inventory || []),
@@ -75,6 +77,7 @@ export async function PUT(request: NextRequest) {
           money || 0,
           experiencePoints || 0,
           level || 1,
+          currentMission || null,
           userId
         ]
       );

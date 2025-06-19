@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { GameProvider } from '@/lib/contexts/game-context'
@@ -9,7 +9,11 @@ export const metadata: Metadata = {
   generator: 'Next.js',
   keywords: ['hacker', 'adventure', 'game', 'puzzle', 'cybersecurity'],
   authors: [{ name: 'INTRUSION Team' }],
-  viewport: 'width=device-width, initial-scale=1',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 }
 
 export default function RootLayout({

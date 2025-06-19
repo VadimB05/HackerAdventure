@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
 
       // Spielstand auf Standardwerte zurücksetzen
       await executeUpdate(
-        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ? WHERE user_id = ?',
-        ['intro', '[]', '{}', 0.00, 0, 1, userId]
+        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
+        ['intro', '[]', '{}', 0.00, 0, 1, 'mission_001', userId]
       );
 
       // Spieler-Statistiken zurücksetzen
