@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useGameState } from "./game-context"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SkipForward } from "lucide-react"
 
 export default function StoryPopup() {
@@ -83,6 +83,11 @@ export default function StoryPopup() {
   return (
     <Dialog open={!!currentStory} onOpenChange={closeStory}>
       <DialogContent className="bg-black border border-green-500 text-green-500 max-w-2xl mx-auto p-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>
+            {currentStory.title || (currentStory.type === "dialog" ? "Dialog" : "Transmission")}
+          </DialogTitle>
+        </DialogHeader>
         <div className="relative">
           {/* Header mit Titel und Skip-Button */}
           <div className="flex justify-between items-center p-4 border-b border-green-800">

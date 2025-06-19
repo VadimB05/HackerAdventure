@@ -1,138 +1,188 @@
-# 🕵️‍♂️ INTRUSION – Hacker Adventure Game
+# INTRUSION - Hacker Adventure
 
-**INTRUSION** ist ein webbasiertes Fullstack-Hacker-Adventure-Game, entwickelt mit **Next.js** und **MariaDB**. Spieler:innen tauchen ein in eine storybasierte Welt aus Code, Rätseln und Sicherheitsmechanismen. Das Spiel kombiniert Point-&-Click-Mechaniken, Terminal-Eingaben und Drag-&-Drop-Logik.
+Ein Next.js-basiertes Hacker-Adventure-Spiel mit React Frontend und Node.js API Backend.
 
----
+## 🎮 Projektübersicht
 
-## 🎯 Ziel des Projekts
+INTRUSION ist ein interaktives Hacker-Adventure-Spiel, das verschiedene Rätseltypen (Point-and-Click, Terminal) und ein Inventarsystem bietet. Das Spiel verwendet eine modulare Struktur für Missionen/Räume und datengetriebenes Level-Design.
 
-- Entwicklung eines modularen Hacker-Spiels mit realitätsnaher Rätselmechanik
-- Vollständige Trennung von Spielinhalten (Missionen, Räume, Rätsel) und Code
-- Umsetzung eines Admin-Editors zur Pflege von Spielinhalten
-- DSGVO-konforme Speicherung und sichere Authentifizierung via JWT
-- Automatisiertes CI/CD mit GitHub Actions
+## 🛠 Technologie-Stack
 
----
+- **Frontend**: Next.js 15 mit App Router, React 19, TypeScript
+- **Backend**: Node.js API-Routen in Next.js
+- **Datenbank**: MariaDB (MySQL-kompatibel) mit mysql2
+- **Authentifizierung**: JWT-basiert
+- **UI**: Radix UI Komponenten mit Tailwind CSS
+- **Styling**: Tailwind CSS mit Dark Mode Support
 
-## ⚙️ Technologie-Stack
+## 📁 Projektstruktur
 
-| Bereich      | Technologie         |
-|-------------|---------------------|
-| Frontend    | Next.js (React, App Router, TypeScript) |
-| Backend     | Next.js API Routes (Node.js) |
-| Datenbank   | MariaDB (mysql2)     |
-| Authentifizierung | JWT + optional OAuth |
-| Admin-Editor| Webbasierte UI (Next.js) |
-| Testing     | Jest, React Testing Library, Supertest |
-| CI/CD       | GitHub Actions       |
-| Deployment  | Lokal oder Vercel    |
+```
+HackerAdventure/
+├── app/                    # Next.js App Router
+│   ├── api/               # API-Routen (Backend)
+│   │   ├── auth/          # Authentifizierung
+│   │   └── game/          # Spiel-Logik
+│   ├── game/              # Spiel-Seiten
+│   ├── globals.css        # Globale Styles
+│   ├── layout.tsx         # Root Layout
+│   └── page.tsx           # Startseite
+├── components/            # React Komponenten
+│   ├── game/              # Spiel-spezifische Komponenten
+│   ├── ui/                # UI-Komponenten (Radix UI)
+│   └── theme-provider.tsx # Theme Provider
+├── lib/                   # Utility-Funktionen
+│   ├── auth.ts           # JWT-Authentifizierung
+│   ├── database.ts       # Datenbankverbindung
+│   └── utils.ts          # Allgemeine Utilities
+├── hooks/                 # Custom React Hooks
+├── public/                # Statische Assets
+└── styles/                # Zusätzliche Styles
+```
 
----
+## 🚀 Einrichtung
 
-## 🧩 Features
+### Voraussetzungen
 
-### 🔐 Authentifizierung
-- Registrierung & Login via Username/Passwort (JWT-basiert)
-- Kein E-Mail erforderlich
-- Admin-Rolle über Datenbank steuerbar
+- Node.js 18+ 
+- pnpm (empfohlen) oder npm
+- MariaDB/MySQL Datenbank
 
-### 🧠 Spielmechanik
-- Modularer Aufbau (Missionen, Räume, Objekte, Rätsel)
-- Rätseltypen: Multiple Choice, Codeeingabe, Terminal
-- Drag-&-Drop für Item-Anwendungen
-- Automatisches Speichern des Spielfortschritts
-- Spielstand-Resume und Session-Handling
+### 1. Repository klonen
 
-### 🎛️ Admin-Editor
-- Erstellung und Bearbeitung von Missionen, Räumen, Objekten, Rätseln
-- Speicherung aller Spielinhalte direkt in MariaDB
-- Kein hartcodierter Content
+```bash
+git clone <repository-url>
+cd HackerAdventure
+```
 
----
+### 2. Dependencies installieren
 
-## 📦 Datenbankmodell
+```bash
+pnpm install
+```
 
-Die SQL-Struktur ist vollständig in der Datei `intrusion_schema.sql` dokumentiert und enthält:
-- `users`, `missions`, `rooms`, `objects`, `items`, `puzzles`, `user_items`, `user_puzzles`, `user_progress`
+### 3. Umgebungsvariablen konfigurieren
 
-> Beispiel-Daten zum Testen sind bereits enthalten!
-
----
-
-## ▶️ Lokale Entwicklung
-
-### 🔧 Voraussetzungen
-- Node.js (v18+ empfohlen)
-- MariaDB Server
-- `.env.local` Datei mit:
+Erstellen Sie eine `.env.local` Datei im Root-Verzeichnis:
 
 ```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=deinpasswort
-DB_NAME=intrusion
-JWT_SECRET=dein_supergeheimer_schlüssel
+# Database Configuration
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+DATABASE_NAME=intrusion_db
+DATABASE_USER=root
+DATABASE_PASSWORD=your_password
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# Next.js Configuration
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-nextauth-secret-change-this-in-production
+
+# Game Configuration
+GAME_VERSION=1.0.0
+DEBUG_MODE=true
 ```
 
-### 💻 Setup
+### 4. Datenbank einrichten
+
+```sql
+-- Datenbank erstellen
+CREATE DATABASE intrusion_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Benutzer-Tabelle erstellen
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Spielstand-Tabelle erstellen
+CREATE TABLE game_states (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    current_room VARCHAR(100) NOT NULL,
+    inventory JSON,
+    progress JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+### 5. Entwicklungsserver starten
 
 ```bash
-# Install dependencies
-npm install
-
-# Starte Entwicklungsserver
-npm run dev
+pnpm dev
 ```
 
-> Hinweis: Vergiss nicht, die Datenbank mit dem SQL-Dump zu initialisieren!
+Das Spiel ist dann unter `http://localhost:3000` verfügbar.
 
----
+## 🔧 Verfügbare Scripts
 
-## 🚦 Tests & CI
+- `pnpm dev` - Entwicklungsserver starten
+- `pnpm build` - Produktions-Build erstellen
+- `pnpm start` - Produktions-Server starten
+- `pnpm lint` - ESLint ausführen
+- `pnpm type-check` - TypeScript-Typen prüfen
 
-### 📦 Tests ausführen
+## 🏗 Architektur
 
-```bash
-# Unit & Integrationstests
-npm run test
-```
+### Frontend (Client-Side)
+- **React Components**: Modulare UI-Komponenten
+- **Game Context**: Zustandsverwaltung für das Spiel
+- **Responsive Design**: Mobile-first Ansatz
+- **Dark Mode**: Unterstützung für dunkles Theme
 
-### 🔁 CI/CD mit GitHub Actions
-- Linting, Unit-Tests, Build
-- Optional: Deployment zu Vercel oder via SSH
+### Backend (Server-Side)
+- **API Routes**: RESTful Endpoints in `/app/api/`
+- **Authentication**: JWT-basierte Authentifizierung
+- **Database**: Sichere SQL-Abfragen mit mysql2
+- **Validation**: Input-Validierung mit Zod
 
----
+### Datenbank
+- **MariaDB**: MySQL-kompatible Datenbank
+- **Connection Pooling**: Optimierte Datenbankverbindungen
+- **JSON Storage**: Flexible Speicherung für Spielstände
 
-## 🗃️ Projektstruktur (Auszug)
+## 🔒 Sicherheit
 
-```
-├── app/
-│   ├── login/...
-│   ├── game/...
-│   └── admin/...
-├── components/...
-├── pages/api/
-│   ├── auth/
-│   ├── game/
-│   └── admin/
-├── lib/db.ts
-├── intrusion_schema.sql
-├── README.md
-└── ...
-```
+- **Password Hashing**: bcryptjs für sichere Passwort-Speicherung
+- **JWT Tokens**: Sichere Session-Verwaltung
+- **SQL Injection Protection**: Prepared Statements
+- **Input Validation**: Umfassende Eingabevalidierung
+- **CORS**: Konfigurierte Cross-Origin Resource Sharing
 
----
+## 🧪 Testing
 
-## 📚 Weiterentwicklung
+Das Projekt ist für Unit- und Integrationstests vorbereitet:
 
-Geplant:
-- Erweiterbare Terminal-Logik
-- Missions-Fortschrittsanzeige
-- Item-Kombinationen & Kombinationserkennung
-- Logging & Analyse gelöster Rätsel
+- **Pure Functions**: Puzzle-Logik als testbare Funktionen
+- **API Testing**: Endpoint-Tests möglich
+- **Component Testing**: React-Komponenten-Tests
 
----
+## 📈 Performance
 
-## 👥 Team
+- **Code Splitting**: Automatisches Code-Splitting durch Next.js
+- **Image Optimization**: Next.js Image-Komponente
+- **Database Optimization**: Connection Pooling
+- **Caching**: Strategien für bessere Performance
 
-- **Vadim Balysev** – Fullstack Entwicklung, Architektur, Datenmodell
+## 🤝 Beitragen
+
+1. Fork das Repository
+2. Erstellen Sie einen Feature-Branch
+3. Committen Sie Ihre Änderungen
+4. Pushen Sie zum Branch
+5. Erstellen Sie einen Pull Request
+
+## 📄 Lizenz
+
+Dieses Projekt ist unter der MIT-Lizenz lizenziert.
+
+## 🆘 Support
+
+Bei Fragen oder Problemen erstellen Sie bitte ein Issue im Repository.
