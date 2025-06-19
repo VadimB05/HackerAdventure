@@ -42,7 +42,7 @@ export default function TerminalMission() {
     if (!inputValue.trim() || !mission || !mission.commands) return
 
     // Füge den eingegebenen Befehl zum Output hinzu
-    setOutput((prev) => [...prev, `nova@echovoid:~$ ${inputValue}`])
+    setOutput((prev) => [...prev, `n0seC@echovoid:~$ ${inputValue}`])
 
     // Prüfe, ob der Befehl korrekt ist
     const currentCommand = mission.commands[currentCommandIndex]
@@ -243,7 +243,7 @@ export default function TerminalMission() {
             </div>
 
             <form onSubmit={handleCommandSubmit} className="flex items-center">
-              <span className="text-green-700 mr-2">nova@echovoid:~$</span>
+              <span className="text-green-700 mr-2">n0seC@echovoid:~$</span>
               <input
                 ref={inputRef}
                 type="text"

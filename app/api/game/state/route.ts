@@ -1,74 +1,95 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth, JWTPayload } from '@/lib/auth';
-import { executeQuery, executeUpdate } from '@/lib/database';
+import { requireAuth } from '@/lib/auth-utils';
+import { executeQuerySingle, executeUpdate } from '@/lib/database';
 
-// Spielstatus abrufen
-async function getGameState(request: NextRequest) {
-  try {
-    const user = (request as any).user as JWTPayload;
-    
-    const gameState = await executeQuery(
-      'SELECT * FROM game_states WHERE user_id = ?',
-      [user.userId]
-    );
+/**
+ * Spielstand abrufen
+ * GET /api/game/state
+ */
+export async function GET(request: NextRequest) {
+  return requireAuth(async (req) => {
+    try {
+      const userId = req.user!.id;
 
-    if (gameState.length === 0) {
-      // Neuen Spielstatus erstellen
-      await executeUpdate(
-        'INSERT INTO game_states (user_id, current_mission, money, inventory, created_at) VALUES (?, 1, 100, ?, NOW())',
-        [user.userId, JSON.stringify([])]
+      // Spielstand aus Datenbank abrufen
+      const gameState = await executeQuerySingle<{
+        current_room: string;
+        inventory: string;
+        progress: string;
+        money: number;
+        experience_points: number;
+        level: number;
+      }>(
+        'SELECT current_room, inventory, progress, money, experience_points, level FROM game_states WHERE user_id = ?',
+        [userId]
       );
-      
+
+      if (!gameState) {
+        return NextResponse.json({
+          success: false,
+          error: 'Spielstand nicht gefunden'
+        }, { status: 404 });
+      }
+
+      // JSON-Strings parsen
+      const parsedGameState = {
+        currentRoom: gameState.current_room,
+        inventory: JSON.parse(gameState.inventory || '[]'),
+        progress: JSON.parse(gameState.progress || '{}'),
+        money: gameState.money,
+        experiencePoints: gameState.experience_points,
+        level: gameState.level
+      };
+
       return NextResponse.json({
-        currentMission: 1,
-        money: 100,
-        inventory: [],
-        isNewGame: true
-      });
+        success: true,
+        gameState: parsedGameState
+      }, { status: 200 });
+
+    } catch (error) {
+      console.error('Fehler beim Abrufen des Spielstands:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Interner Serverfehler'
+      }, { status: 500 });
     }
-
-    const state = gameState[0] as any;
-    
-    return NextResponse.json({
-      currentMission: state.current_mission,
-      money: state.money,
-      inventory: JSON.parse(state.inventory || '[]'),
-      isNewGame: false
-    });
-
-  } catch (error) {
-    console.error('Fehler beim Abrufen des Spielstatus:', error);
-    return NextResponse.json(
-      { error: 'Fehler beim Abrufen des Spielstatus' },
-      { status: 500 }
-    );
-  }
+  })(request);
 }
 
-// Spielstatus aktualisieren
-async function updateGameState(request: NextRequest) {
-  try {
-    const user = (request as any).user as JWTPayload;
-    const { currentMission, money, inventory } = await request.json();
+/**
+ * Spielstand aktualisieren
+ * PUT /api/game/state
+ */
+export async function PUT(request: NextRequest) {
+  return requireAuth(async (req) => {
+    try {
+      const userId = req.user!.id;
+      const { currentRoom, inventory, progress, money, experiencePoints, level } = await request.json();
 
-    await executeUpdate(
-      'UPDATE game_states SET current_mission = ?, money = ?, inventory = ?, updated_at = NOW() WHERE user_id = ?',
-      [currentMission, money, JSON.stringify(inventory), user.userId]
-    );
+      await executeUpdate(
+        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ? WHERE user_id = ?',
+        [
+          currentRoom,
+          JSON.stringify(inventory || []),
+          JSON.stringify(progress || {}),
+          money || 0,
+          experiencePoints || 0,
+          level || 1,
+          userId
+        ]
+      );
 
-    return NextResponse.json({
-      message: 'Spielstatus erfolgreich aktualisiert'
-    });
+      return NextResponse.json({
+        success: true,
+        message: 'Spielstand erfolgreich aktualisiert'
+      }, { status: 200 });
 
-  } catch (error) {
-    console.error('Fehler beim Aktualisieren des Spielstatus:', error);
-    return NextResponse.json(
-      { error: 'Fehler beim Aktualisieren des Spielstatus' },
-      { status: 500 }
-    );
-  }
-}
-
-// Geschützte Routen mit Authentifizierung
-export const GET = withAuth(getGameState);
-export const PUT = withAuth(updateGameState); 
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren des Spielstands:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Interner Serverfehler'
+      }, { status: 500 });
+    }
+  })(request);
+} 

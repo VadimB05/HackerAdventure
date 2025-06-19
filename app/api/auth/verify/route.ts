@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, extractToken } from '@/lib/auth';
+import { getAuthenticatedUser } from '@/lib/auth-utils';
+import { getUserById } from '@/lib/services/auth-service';
 
 /**
  * JWT-Token verifizieren
@@ -7,36 +8,40 @@ import { verifyToken, extractToken } from '@/lib/auth';
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = extractToken(request);
-    
-    if (!token) {
-      return NextResponse.json({
-        success: false,
-        error: 'Kein Token bereitgestellt'
-      }, { status: 401 });
-    }
+    const user = getAuthenticatedUser(request);
 
-    const user = verifyToken(token);
-    
     if (!user) {
       return NextResponse.json({
         success: false,
-        error: 'Ungültiger Token'
+        error: 'Nicht authentifiziert'
       }, { status: 401 });
+    }
+
+    // Vollständige Benutzerdaten aus Datenbank abrufen
+    const dbUser = await getUserById(user.id);
+
+    if (!dbUser) {
+      return NextResponse.json({
+        success: false,
+        error: 'Benutzer nicht gefunden'
+      }, { status: 404 });
     }
 
     return NextResponse.json({
       success: true,
       user: {
-        id: user.userId,
-        username: user.username
-      },
-      message: 'Token ist gültig'
+        id: dbUser.id,
+        username: dbUser.username,
+        email: dbUser.email,
+        isAdmin: dbUser.isAdmin
+      }
     }, { status: 200 });
+
   } catch (error) {
+    console.error('Token-Verifikationsfehler:', error);
     return NextResponse.json({
       success: false,
-      error: 'Token-Verifikation fehlgeschlagen'
+      error: 'Interner Serverfehler'
     }, { status: 500 });
   }
 } 

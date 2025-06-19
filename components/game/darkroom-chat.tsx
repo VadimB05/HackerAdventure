@@ -17,7 +17,7 @@ export default function DarkroomChat() {
     if (!input.trim()) return
 
     // Add user message
-    addMessage("NOVA", input)
+    addMessage("n0seC", input)
 
     // Simulate response based on user input
     setTimeout(() => {
@@ -34,7 +34,7 @@ export default function DarkroomChat() {
         response =
           "Try using nmap to scan the target IP. Look for open ports, especially SSH or database ports. Check your terminal for more information."
       } else if (lowerInput.includes("who") || lowerInput.includes("identity")) {
-        response = "Who I am is not important. Focus on the mission, NOVA. Your skills are what matter here."
+        response = "Who I am is not important. Focus on the mission, n0seC. Your skills are what matter here."
       }
 
       addMessage("DARKROOM", response)
@@ -59,7 +59,7 @@ export default function DarkroomChat() {
         {messages.map((msg, index) => (
           <div
             key={index}
-            className={`mb-4 max-w-[80%] ${msg.sender === "NOVA" ? "ml-auto bg-green-900" : "bg-gray-900"} p-3 rounded`}
+            className={`mb-4 max-w-[80%] ${msg.sender === "n0seC" ? "ml-auto bg-green-900" : "bg-gray-900"} p-3 rounded`}
           >
             <div className="font-bold mb-1">{msg.sender}</div>
             <p>{msg.content}</p>

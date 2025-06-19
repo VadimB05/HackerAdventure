@@ -146,7 +146,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<{ sender: string; content: string; timestamp: string }[]>([
     {
       sender: "DARKROOM",
-      content: "Welcome to INTRUSION, NOVA. Your first mission awaits. Check your terminal.",
+      content: "Welcome to INTRUSION, n0seC. Your first mission awaits. Check your terminal.",
       timestamp: new Date().toISOString(),
     },
   ])

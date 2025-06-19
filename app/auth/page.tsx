@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -10,14 +10,22 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useGame } from '@/lib/contexts/game-context';
 
 export default function AuthPage() {
   const router = useRouter();
+  const { login } = useGame();
   const [activeTab, setActiveTab] = useState('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Client-seitige Initialisierung
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Login State
   const [loginData, setLoginData] = useState({
@@ -39,20 +47,12 @@ export default function AuthPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginData),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        router.push('/game');
+      const success = await login(loginData.username, loginData.password);
+      
+      if (success) {
+        router.push('/');
       } else {
-        setError(data.error || 'Anmeldung fehlgeschlagen');
+        setError('Benutzername oder Passwort ist falsch');
       }
     } catch (error) {
       setError('Verbindungsfehler');
@@ -90,7 +90,12 @@ export default function AuthPage() {
 
       if (data.success) {
         // Automatisch anmelden nach Registrierung
-        router.push('/game');
+        const loginSuccess = await login(registerData.username, registerData.password);
+        if (loginSuccess) {
+          router.push('/');
+        } else {
+          setError('Registrierung erfolgreich, aber automatische Anmeldung fehlgeschlagen');
+        }
       } else {
         setError(data.error || 'Registrierung fehlgeschlagen');
       }
@@ -101,8 +106,20 @@ export default function AuthPage() {
     }
   };
 
+  // Verhindere Rendering bis Client-seitig geladen
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black text-white flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-cyan-400" />
+          <p className="text-lg text-gray-300">Lade...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black text-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-black text-white flex items-center justify-center p-4" suppressHydrationWarning>
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">

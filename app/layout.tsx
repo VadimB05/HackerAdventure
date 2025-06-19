@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { GameProvider } from '@/lib/contexts/game-context'
 
 export const metadata: Metadata = {
   title: 'INTRUSION - Hacker Adventure',
@@ -25,7 +26,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <GameProvider>
+            {children}
+          </GameProvider>
         </ThemeProvider>
       </body>
     </html>
