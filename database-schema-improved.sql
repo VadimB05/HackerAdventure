@@ -245,6 +245,19 @@ CREATE TABLE player_sessions (
     INDEX idx_session_start (session_start)
 );
 
+-- Zuordnungstabelle: Items in Räumen
+CREATE TABLE room_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    room_id VARCHAR(100) NOT NULL,
+    item_id VARCHAR(100) NOT NULL,
+    quantity INT DEFAULT 1,
+    placed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(item_id) ON DELETE CASCADE,
+    INDEX idx_room_id (room_id),
+    INDEX idx_item_id (item_id)
+);
+
 -- Standard-Daten einfügen
 
 -- Standard-Missionen

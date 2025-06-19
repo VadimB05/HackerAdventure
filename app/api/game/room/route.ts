@@ -113,8 +113,13 @@ export async function GET(request: NextRequest) {
         max_stack_size: number;
         durability: number | null;
         effects: string;
+        quantity: number;
       }>(
-        'SELECT * FROM items WHERE room_id = ? ORDER BY rarity DESC, value DESC',
+        `SELECT i.*, ri.quantity
+         FROM room_items ri
+         JOIN items i ON i.item_id = ri.item_id
+         WHERE ri.room_id = ?
+         ORDER BY i.rarity DESC, i.value DESC`,
         [roomId]
       );
 
@@ -211,7 +216,8 @@ export async function GET(request: NextRequest) {
         isStackable: item.is_stackable,
         maxStackSize: item.max_stack_size,
         durability: item.durability,
-        effects: JSON.parse(item.effects || '[]')
+        effects: JSON.parse(item.effects || '[]'),
+        quantity: item.quantity
       }));
 
       // Missiondaten formatieren

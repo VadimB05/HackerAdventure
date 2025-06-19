@@ -83,6 +83,9 @@ ON DUPLICATE KEY UPDATE
 UPDATE rooms SET connections = '{"basement": {"id": "basement", "name": "Keller", "description": "Ein dunkler Keller mit Computerausrüstung"}}' WHERE room_id = 'intro';
 UPDATE rooms SET connections = '{"intro": {"id": "intro", "name": "Einleitung", "description": "Zurück zur Einleitung"}}' WHERE room_id = 'basement';
 
+-- Beispiel-Item in den Start-Raum einfügen
+INSERT INTO room_items (room_id, item_id, quantity) VALUES ('intro', 'usb_stick', 1);
+
 -- Überprüfung
 SELECT 'Missions und Räume erfolgreich erstellt!' as status;
 SELECT COUNT(*) as mission_count FROM missions;

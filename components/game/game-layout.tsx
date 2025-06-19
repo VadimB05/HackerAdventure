@@ -13,6 +13,7 @@ import HackingMission from "./hacking-mission"
 import TerminalMission from "./terminal-mission"
 import MoneyPopup from "./money-popup"
 import CityView from "./city-view" // Neue Komponente für die Stadt
+import RoomView from "./room-view"
 import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
 
@@ -80,6 +81,16 @@ export default function GameLayout() {
             </Button>
           </div>
         </div>
+
+        {/* Raum-Informationen */}
+        {currentView === "apartment" && (
+          <div className="bg-black/70 backdrop-blur-sm border border-green-500 rounded-lg px-3 py-2">
+            <div className="text-center">
+              <h3 className="text-green-400 font-bold text-sm">Mein Zimmer</h3>
+              <p className="text-green-300 text-xs">Ein abgedunkeltes Zimmer mit Computer, Fenster und Smartphone.</p>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Game state display (day counter, bitcoin, etc.) */}
@@ -87,7 +98,7 @@ export default function GameLayout() {
 
       {/* Main game content area */}
       <main className="flex-1 overflow-hidden">
-        {currentView === "apartment" && <PointAndClick />}
+        {currentView === "apartment" && <RoomView roomId="intro" />}
         {currentView === "terminal" && <Terminal />}
         {currentView === "smartphone" && <Smartphone />}
         {currentView === "darkroom" && <DarknetChat />}
