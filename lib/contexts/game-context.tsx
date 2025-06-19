@@ -71,6 +71,12 @@ interface GameContextType {
   startNewGame: () => Promise<void>;
   continueGame: () => Promise<void>;
   checkGameProgress: () => Promise<boolean>;
+  loadRoomData: (roomId: string) => Promise<{
+    room: any;
+    puzzles: any[];
+    items: any[];
+    mission: any;
+  } | null>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -263,6 +269,36 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loadRoomData = async (roomId: string): Promise<{
+    room: any;
+    puzzles: any[];
+    items: any[];
+    mission: any;
+  } | null> => {
+    try {
+      const response = await fetch(`/api/game/room?roomId=${encodeURIComponent(roomId)}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          room: data.room,
+          puzzles: data.puzzles,
+          items: data.items,
+          mission: data.mission
+        };
+      } else {
+        console.error('Failed to load room data');
+        return null;
+      }
+    } catch (error) {
+      console.error('Loading room data failed:', error);
+      return null;
+    }
+  };
+
   const value: GameContextType = {
     user,
     gameState,
@@ -276,7 +312,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     logout,
     startNewGame,
     continueGame,
-    checkGameProgress
+    checkGameProgress,
+    loadRoomData
   };
 
   return (
