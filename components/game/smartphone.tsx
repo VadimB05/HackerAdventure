@@ -263,8 +263,8 @@ export default function Smartphone() {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-gray-950 p-4">
-      <div className="w-full max-w-sm h-full max-h-[600px] bg-black border-4 border-gray-700 rounded-3xl overflow-hidden flex flex-col">
+    <div className="h-full flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-sm h-full max-h-[600px] bg-black border-4 border-gray-700 rounded-3xl overflow-hidden flex flex-col relative">
         {/* Phone status bar */}
         <div className="bg-gray-900 p-2 flex justify-between items-center text-xs">
           <span>4:20 PM</span>
@@ -296,7 +296,15 @@ export default function Smartphone() {
         {/* Phone home button */}
         <div className="p-2 flex justify-center">
           <button
-            onClick={() => setCurrentApp("home")}
+            onClick={() => {
+              if (currentApp === "home") {
+                // Wenn wir bereits in der Home-Ansicht sind, schließen wir das Smartphone
+                window.dispatchEvent(new CustomEvent('closeSmartphone'));
+              } else {
+                // Ansonsten gehen wir zur Home-Ansicht
+                setCurrentApp("home");
+              }
+            }}
             className="w-12 h-12 rounded-full border-2 border-gray-700 flex items-center justify-center"
           >
             <div className="w-8 h-1 bg-gray-700 rounded-full"></div>

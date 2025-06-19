@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { Power } from 'lucide-react';
 import Smartphone from './smartphone';
 
 interface SmartphoneOverlayProps {
@@ -12,6 +12,18 @@ interface SmartphoneOverlayProps {
 }
 
 export default function SmartphoneOverlay({ isOpen, onClose }: SmartphoneOverlayProps) {
+  React.useEffect(() => {
+    const handleCloseSmartphone = () => {
+      onClose();
+    };
+
+    window.addEventListener('closeSmartphone', handleCloseSmartphone);
+    
+    return () => {
+      window.removeEventListener('closeSmartphone', handleCloseSmartphone);
+    };
+  }, [onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -37,25 +49,21 @@ export default function SmartphoneOverlay({ isOpen, onClose }: SmartphoneOverlay
               stiffness: 200,
               duration: 0.5 
             }}
-            className="fixed inset-0 z-50 flex items-end"
+            className="fixed inset-0 z-50 flex items-end justify-center"
           >
+            {/* Linker Klickbereich */}
+            <div className="flex-1 h-full cursor-pointer" onClick={onClose} />
+            
             {/* Smartphone-Inhalt */}
-            <div className="w-full h-full bg-black rounded-t-3xl overflow-hidden relative">
-              {/* Schließen-Button */}
-              <Button
-                onClick={onClose}
-                variant="ghost"
-                size="sm"
-                className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full w-10 h-10 p-0"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-              
+            <div className="w-full max-w-sm h-full bg-transparent rounded-t-3xl overflow-hidden relative">
               {/* Smartphone-Komponente */}
               <div className="w-full h-full">
                 <Smartphone />
               </div>
             </div>
+            
+            {/* Rechter Klickbereich */}
+            <div className="flex-1 h-full cursor-pointer" onClick={onClose} />
           </motion.div>
         </>
       )}
