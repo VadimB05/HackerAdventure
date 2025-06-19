@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-
-// JWT Secret aus Umgebungsvariablen
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+import { jwtConfig } from './config';
 
 // Token-Interface
 export interface JWTPayload {
@@ -15,7 +13,7 @@ export interface JWTPayload {
 // Token validieren
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const decoded = jwt.verify(token, jwtConfig.secret) as JWTPayload;
     return decoded;
   } catch (error) {
     console.error('Token-Validierungsfehler:', error);
@@ -78,5 +76,8 @@ export function withAuth(handler: Function) {
 
 // Token generieren
 export function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign(payload, jwtConfig.secret, { 
+    expiresIn: jwtConfig.expiresIn,
+    algorithm: jwtConfig.algorithm
+  });
 } 

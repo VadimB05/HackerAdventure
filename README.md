@@ -63,33 +63,53 @@ pnpm install
 
 ### 3. Umgebungsvariablen konfigurieren
 
-Erstellen Sie eine `.env.local` Datei im Root-Verzeichnis:
+**Option A: Automatisches Setup (empfohlen)**
+```bash
+pnpm run setup-env
+```
 
+**Option B: Manuelles Setup**
+```bash
+# Kopiere die Beispiel-Konfiguration
+cp env.example .env
+
+# Bearbeite die .env Datei mit deinen Werten
+```
+
+**Erforderliche Umgebungsvariablen:**
 ```env
-# Database Configuration
-DATABASE_HOST=localhost
-DATABASE_PORT=3306
-DATABASE_NAME=intrusion_db
-DATABASE_USER=root
-DATABASE_PASSWORD=your_password
+# ========================================
+# DATENBANK-KONFIGURATION
+# ========================================
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password_here
+DB_NAME=intrusion_game
 
-# JWT Configuration
+# ========================================
+# JWT-AUTHENTIFIZIERUNG
+# ========================================
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
-# Next.js Configuration
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-nextauth-secret-change-this-in-production
-
-# Game Configuration
-GAME_VERSION=1.0.0
-DEBUG_MODE=true
+# ========================================
+# NEXT.JS-KONFIGURATION
+# ========================================
+NODE_ENV=development
+DEBUG=false
 ```
+
+**Wichtige Hinweise:**
+- Die `.env` Datei ist bereits in `.gitignore` enthalten
+- Ändere das `JWT_SECRET` in Produktion (mindestens 32 Zeichen)
+- Verwende starke Passwörter für die Datenbank
+- Siehe `ENVIRONMENT.md` für detaillierte Dokumentation
 
 ### 4. Datenbank einrichten
 
 ```sql
 -- Datenbank erstellen
-CREATE DATABASE intrusion_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE intrusion_game CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Benutzer-Tabelle erstellen
 CREATE TABLE users (
@@ -128,6 +148,7 @@ Das Spiel ist dann unter `http://localhost:3000` verfügbar.
 - `pnpm start` - Produktions-Server starten
 - `pnpm lint` - ESLint ausführen
 - `pnpm type-check` - TypeScript-Typen prüfen
+- `pnpm setup-env` - Umgebungskonfiguration einrichten
 
 ## 🏗 Architektur
 
@@ -155,6 +176,7 @@ Das Spiel ist dann unter `http://localhost:3000` verfügbar.
 - **SQL Injection Protection**: Prepared Statements
 - **Input Validation**: Umfassende Eingabevalidierung
 - **CORS**: Konfigurierte Cross-Origin Resource Sharing
+- **Environment Variables**: Sichere Konfigurationsverwaltung
 
 ## 🧪 Testing
 
