@@ -59,7 +59,7 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Computer',
         description: 'Mein Desktop-Computer. Hier kann ich hacken, Programme schreiben und Missionen starten.',
         type: 'puzzle' as const,
-        x: 25, // Links mittig
+        x: 12, // Links mittig
         y: 35, // Etwas oberhalb der Mitte
         width: 20, // Breiter für Computer
         height: 15, // Höher für Computer
@@ -71,8 +71,8 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Fenster',
         description: 'Ein abgedunkeltes Fenster. Hier kann ich die Außenwelt beobachten und Informationen sammeln.',
         type: 'puzzle' as const,
-        x: 70, // Rechts
-        y: 25, // Oben
+        x: 47.5, // Rechts
+        y: 10, // Oben
         width: 25, // Breit für Fenster
         height: 20, // Hoch für Fenster
         status: 'available',
@@ -83,7 +83,7 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Smartphone',
         description: 'Mein Smartphone. Hier kann ich Nachrichten empfangen, Apps nutzen und Kontakte verwalten.',
         type: 'puzzle' as const,
-        x: 15, // Links unten
+        x: 30, // Links unten
         y: 60, // Unten
         width: 12, // Klein für Handy
         height: 8, // Klein für Handy
@@ -95,8 +95,8 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Tür',
         description: 'Die Zimmertür. Hier kann ich das Zimmer verlassen und auf Missionen gehen.',
         type: 'exit' as const,
-        x: 85, // Rechts unten
-        y: 55, // Unten
+        x: 80, // Rechts unten
+        y: 20, // Unten
         width: 12, // Standard für Tür
         height: 18, // Standard für Tür
         icon: 'DoorOpen'
