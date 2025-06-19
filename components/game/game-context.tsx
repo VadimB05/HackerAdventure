@@ -652,6 +652,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
     ])
   }
 
+  // Event-Listener für View-Änderungen von Interaktionspunkten
+  useEffect(() => {
+    const handleViewChange = (event: CustomEvent) => {
+      const newView = event.detail as View;
+      setCurrentView(newView);
+    };
+
+    window.addEventListener('changeView', handleViewChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('changeView', handleViewChange as EventListener);
+    };
+  }, []);
+
   // Füge Entscheidungsfunktionen zum value-Objekt hinzu
   const value = {
     currentView,

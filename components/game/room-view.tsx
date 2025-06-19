@@ -1,38 +1,29 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useGame } from '@/lib/contexts/game-context';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Puzzle, 
-  Package, 
-  DoorOpen, 
-  Lock, 
-  Eye, 
-  EyeOff,
-  MapPin,
-  Trophy,
-  Coins,
-  Zap
-} from 'lucide-react';
+import { Zap, Eye, Puzzle, Lock, Trophy, Package, MapPin, Coins, DoorOpen, Monitor, MessageSquare, MapPin as MapPinIcon, Server } from 'lucide-react';
+import { useGameState } from './game-context';
+import SmartphoneOverlay from './smartphone-overlay';
+import ChoicePopup from './choice-popup';
+import MessagePopup from './message-popup';
 
 interface InteractiveObject {
   id: string;
   type: 'puzzle' | 'item' | 'exit' | 'npc';
   name: string;
   description: string;
-  x: number; // Prozentuale Position X (0-100)
-  y: number; // Prozentuale Position Y (0-100)
-  width: number; // Prozentuale Breite
-  height: number; // Prozentuale Höhe
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   isVisible: boolean;
   isInteractable: boolean;
   icon?: string;
   status?: 'completed' | 'locked' | 'available' | 'hidden';
-  quantity?: number; // Für Items
+  quantity?: number;
 }
 
 interface RoomViewProps {
@@ -41,28 +32,33 @@ interface RoomViewProps {
   onExitClick?: (exitId: string) => void;
 }
 
-function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
-  const { loadRoomData } = useGame();
-  const [showHints, setShowHints] = useState(false);
+export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
+  const { setCurrentView } = useGameState();
   const [hoveredObject, setHoveredObject] = useState<string | null>(null);
   const [tooltipData, setTooltipData] = useState<InteractiveObject | null>(null);
+  const [isSmartphoneOpen, setIsSmartphoneOpen] = useState(false);
+  
+  // Popup States
+  const [isComputerPopupOpen, setIsComputerPopupOpen] = useState(false);
+  const [isDoorPopupOpen, setIsDoorPopupOpen] = useState(false);
+  const [isWindowPopupOpen, setIsWindowPopupOpen] = useState(false);
 
   // Mock-Raumdaten für das eigene Zimmer
   const roomData = {
     id: roomId,
     name: 'Mein Zimmer',
     description: 'Ein abgedunkeltes Zimmer mit Computer, Fenster und Smartphone.',
-    background: '/room-bedroom.png', // Zimmer-Bild
+    background: '/room-bedroom.png',
     objects: [
       {
         id: 'computer',
         name: 'Computer',
         description: 'Mein Desktop-Computer. Hier kann ich hacken, Programme schreiben und Missionen starten.',
         type: 'puzzle' as const,
-        x: 12, // Links mittig
-        y: 35, // Etwas oberhalb der Mitte
-        width: 20, // Breiter für Computer
-        height: 15, // Höher für Computer
+        x: 12,
+        y: 35,
+        width: 20,
+        height: 15,
         status: 'available',
         icon: 'Zap'
       },
@@ -71,10 +67,10 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Fenster',
         description: 'Ein abgedunkeltes Fenster. Hier kann ich die Außenwelt beobachten und Informationen sammeln.',
         type: 'puzzle' as const,
-        x: 47.5, // Rechts
-        y: 10, // Oben
-        width: 25, // Breit für Fenster
-        height: 20, // Hoch für Fenster
+        x: 47.5,
+        y: 10,
+        width: 25,
+        height: 20,
         status: 'available',
         icon: 'Eye'
       },
@@ -83,10 +79,10 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Smartphone',
         description: 'Mein Smartphone. Hier kann ich Nachrichten empfangen, Apps nutzen und Kontakte verwalten.',
         type: 'puzzle' as const,
-        x: 30, // Links unten
-        y: 60, // Unten
-        width: 12, // Klein für Handy
-        height: 8, // Klein für Handy
+        x: 30,
+        y: 60,
+        width: 12,
+        height: 8,
         status: 'available',
         icon: 'Package'
       },
@@ -95,10 +91,10 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         name: 'Tür',
         description: 'Die Zimmertür. Hier kann ich das Zimmer verlassen und auf Missionen gehen.',
         type: 'exit' as const,
-        x: 80, // Rechts unten
-        y: 20, // Unten
-        width: 12, // Standard für Tür
-        height: 18, // Standard für Tür
+        x: 80,
+        y: 20,
+        width: 12,
+        height: 18,
         icon: 'DoorOpen'
       }
     ]
@@ -110,43 +106,40 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
     isInteractable: true
   }));
 
-  // Icon-Helper-Funktionen
-  const getPuzzleIcon = (puzzleType: string) => {
-    switch (puzzleType) {
-      case 'terminal': return 'Zap';
-      case 'point_and_click': return 'Eye';
-      case 'logic': return 'Puzzle';
-      case 'password': return 'Lock';
-      case 'sequence': return 'Trophy';
-      default: return 'Puzzle';
-    }
-  };
-
-  const getItemIcon = (itemType: string) => {
-    switch (itemType) {
-      case 'tool': return 'Package';
-      case 'key': return 'Lock';
-      case 'document': return 'MapPin';
-      case 'consumable': return 'Coins';
-      default: return 'Package';
-    }
-  };
-
   // Objekt-Klick-Handler
   const handleObjectClick = (object: InteractiveObject) => {
+    console.log('Object clicked:', object.id, object.type);
     if (!object.isInteractable) return;
     
-    if (object.type === 'exit') {
-      onExitClick?.(object.id);
-    } else {
-      onObjectClick?.(object);
+    // Verbinde mit den vorhandenen Komponenten
+    switch (object.id) {
+      case 'computer':
+        console.log('Opening computer popup');
+        setIsComputerPopupOpen(true);
+        break;
+      case 'smartphone':
+        console.log('Opening smartphone overlay');
+        setIsSmartphoneOpen(true);
+        break;
+      case 'window':
+        console.log('Opening window popup');
+        setIsWindowPopupOpen(true);
+        break;
+      case 'door':
+        console.log('Opening door popup');
+        setIsDoorPopupOpen(true);
+        break;
+      default:
+        if (object.type === 'exit') {
+          onExitClick?.(object.id);
+        } else {
+          onObjectClick?.(object);
+        }
     }
   };
 
   const handleObjectHover = (object: InteractiveObject, event: React.MouseEvent) => {
     setHoveredObject(object.id);
-    
-    // Setze Tooltip-Position auf Mausposition
     setTooltipData(object);
   };
 
@@ -299,29 +292,71 @@ function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
         )}
       </AnimatePresence>
 
-      {/* Hinweise (wenn aktiviert) */}
-      {showHints && (
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="absolute bottom-4 left-4 max-w-sm"
-        >
-          <Card className="bg-black/70 backdrop-blur-sm border-yellow-500">
-            <CardContent className="p-4">
-              <h3 className="font-semibold text-yellow-400 mb-2">Hinweise</h3>
-              <ul className="text-sm text-gray-300 space-y-1">
-                {interactiveObjects
-                  .filter(obj => obj.type === 'puzzle' && obj.isInteractable)
-                  .map(obj => (
-                    <li key={obj.id}>• {obj.name} - {obj.description}</li>
-                  ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+      {/* Computer-Auswahl-Popup */}
+      <ChoicePopup
+        isOpen={isComputerPopupOpen}
+        title="Computer öffnen"
+        description="Was möchtest du öffnen?"
+        options={[
+          {
+            id: 'terminal',
+            label: 'Terminal',
+            description: 'Hacking, Programmierung, Missionen',
+            icon: <Monitor className="h-5 w-5" />
+          },
+          {
+            id: 'darkroom',
+            label: 'DarkChat',
+            description: 'Darknet-Kommunikation',
+            icon: <MessageSquare className="h-5 w-5" />
+          }
+        ]}
+        onSelect={(optionId) => {
+          setIsComputerPopupOpen(false);
+          setCurrentView(optionId as any);
+        }}
+        onCancel={() => setIsComputerPopupOpen(false)}
+      />
+
+      {/* Tür-Auswahl-Popup */}
+      <ChoicePopup
+        isOpen={isDoorPopupOpen}
+        title="Wohin möchtest du gehen?"
+        description="Wähle dein Ziel"
+        options={[
+          {
+            id: 'basement',
+            label: 'Basement',
+            description: 'Untergrund-Hacking-Zentrale',
+            icon: <Server className="h-5 w-5" />
+          },
+          {
+            id: 'city',
+            label: 'City',
+            description: 'Außenwelt erkunden',
+            icon: <MapPinIcon className="h-5 w-5" />
+          }
+        ]}
+        onSelect={(optionId) => {
+          setIsDoorPopupOpen(false);
+          setCurrentView(optionId as any);
+        }}
+        onCancel={() => setIsDoorPopupOpen(false)}
+      />
+
+      {/* Fenster-Nachricht-Popup */}
+      <MessagePopup
+        isOpen={isWindowPopupOpen}
+        title="Fenster"
+        message="Du hast eine weile aus dem Fenster geschaut, mach dich wieder an die Arbeit"
+        onClose={() => setIsWindowPopupOpen(false)}
+      />
+
+      {/* Smartphone-Overlay */}
+      <SmartphoneOverlay 
+        isOpen={isSmartphoneOpen} 
+        onClose={() => setIsSmartphoneOpen(false)} 
+      />
     </div>
   );
-}
-
-export default RoomView; 
+} 
