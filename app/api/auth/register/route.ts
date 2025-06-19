@@ -1,69 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { connectDB } from '@/lib/database';
+import { validateRegister } from '@/lib/validation';
+import { registerUser } from '@/lib/services/auth-service';
 
+/**
+ * Benutzer registrieren
+ * POST /api/auth/register
+ * Body: { username: string, password: string, email?: string, confirmPassword?: string }
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    const body = await request.json();
 
-    // Validierung der Eingabedaten
-    if (!username || !password) {
-      return NextResponse.json(
-        { error: 'Benutzername und Passwort sind erforderlich' },
-        { status: 400 }
-      );
+    // Eingabedaten validieren
+    const validation = validateRegister(body);
+    
+    if (!validation.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'Validierungsfehler',
+        details: validation.errors
+      }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Passwort muss mindestens 6 Zeichen lang sein' },
-        { status: 400 }
-      );
+    const { username, password, email } = validation.data;
+
+    // Benutzer registrieren
+    const result = await registerUser(username, password, email);
+
+    if (!result.success) {
+      return NextResponse.json({
+        success: false,
+        error: result.error
+      }, { status: 400 });
     }
 
-    const db = await connectDB();
-
-    // Prüfen, ob Benutzer bereits existiert
-    const [existingUsers] = await db.execute(
-      'SELECT id FROM users WHERE username = ?',
-      [username]
-    );
-
-    if (Array.isArray(existingUsers) && existingUsers.length > 0) {
-      return NextResponse.json(
-        { error: 'Benutzername bereits vergeben' },
-        { status: 409 }
-      );
-    }
-
-    // Passwort hashen
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Benutzer in Datenbank einfügen
-    const [result] = await db.execute(
-      'INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, NOW())',
-      [username, hashedPassword]
-    );
-
-    // JWT Token generieren
-    const token = jwt.sign(
-      { userId: (result as any).insertId, username },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '24h' }
-    );
-
-    return NextResponse.json({
+    // Erfolgreiche Registrierung
+    const response = NextResponse.json({
+      success: true,
       message: 'Benutzer erfolgreich registriert',
-      token,
-      user: { id: (result as any).insertId, username }
+      user: {
+        id: result.user!.id,
+        username: result.user!.username,
+        email: result.user!.email
+      }
+    }, { status: 201 });
+
+    // JWT-Token als HTTP-Only Cookie setzen
+    response.cookies.set('auth-token', result.token!, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 Stunden
     });
+
+    return response;
 
   } catch (error) {
     console.error('Registrierungsfehler:', error);
-    return NextResponse.json(
-      { error: 'Interner Serverfehler' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Interner Serverfehler bei der Registrierung'
+    }, { status: 500 });
   }
 } 
