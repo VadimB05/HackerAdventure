@@ -20,9 +20,50 @@ interface GameState {
   currentMission?: string | null;
 }
 
+interface RoomData {
+  roomId: string;
+  name: string;
+  description: string;
+  backgroundImage?: string;
+  ambientSound?: string;
+  connections: Record<string, any>;
+  requiredLevel: number;
+  isLocked: boolean;
+}
+
+interface MissionData {
+  missionId: string;
+  name: string;
+  description: string;
+  difficulty: number;
+  requiredLevel: number;
+  rewardMoney: number;
+  rewardExp: number;
+}
+
+interface SolvedPuzzle {
+  puzzleId: string;
+  completedAt: string;
+  attempts: number;
+  bestTimeSeconds?: number;
+}
+
+interface PlayerStats {
+  puzzlesSolved: number;
+  roomsVisited: number;
+  missionsCompleted: number;
+  totalMoneyEarned: number;
+  totalExpEarned: number;
+  playTimeMinutes: number;
+}
+
 interface GameContextType {
   user: User | null;
   gameState: GameState | null;
+  roomData: RoomData | null;
+  missionData: MissionData | null;
+  solvedPuzzles: SolvedPuzzle[];
+  playerStats: PlayerStats | null;
   isLoading: boolean;
   hasGameProgress: boolean;
   login: (username: string, password: string) => Promise<boolean>;
@@ -38,6 +79,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [roomData, setRoomData] = useState<RoomData | null>(null);
+  const [missionData, setMissionData] = useState<MissionData | null>(null);
+  const [solvedPuzzles, setSolvedPuzzles] = useState<SolvedPuzzle[]>([]);
+  const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasGameProgress, setHasGameProgress] = useState(false);
 
@@ -79,6 +124,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const checkGameProgress = async (): Promise<boolean> => {
     if (!user) {
       setGameState(null);
+      setRoomData(null);
+      setMissionData(null);
+      setSolvedPuzzles([]);
+      setPlayerStats(null);
       setHasGameProgress(false);
       return false;
     }
@@ -92,23 +141,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         setGameState(data.gameState);
-        
-        // Prüfen ob Spielstand vorhanden ist (nicht nur intro)
-        const hasProgress = data.gameState && 
-          (data.gameState.currentRoom !== 'intro' || 
-           data.gameState.level > 1 || 
-           data.gameState.experiencePoints > 0);
-        
-        setHasGameProgress(hasProgress);
-        return hasProgress;
+        setRoomData(data.roomData);
+        setMissionData(data.missionData);
+        setSolvedPuzzles(data.solvedPuzzles || []);
+        setPlayerStats(data.playerStats);
+        setHasGameProgress(data.hasGameProgress);
+        return data.hasGameProgress;
       } else {
         setGameState(null);
+        setRoomData(null);
+        setMissionData(null);
+        setSolvedPuzzles([]);
+        setPlayerStats(null);
         setHasGameProgress(false);
         return false;
       }
     } catch (error) {
       console.error('Game progress check failed:', error);
       setGameState(null);
+      setRoomData(null);
+      setMissionData(null);
+      setSolvedPuzzles([]);
+      setPlayerStats(null);
       setHasGameProgress(false);
       return false;
     }
@@ -135,6 +189,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         // Bei fehlgeschlagener Anmeldung User-Status zurücksetzen
         setUser(null);
         setGameState(null);
+        setRoomData(null);
+        setMissionData(null);
+        setSolvedPuzzles([]);
+        setPlayerStats(null);
         setHasGameProgress(false);
         return false;
       }
@@ -143,6 +201,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // Bei Fehler User-Status zurücksetzen
       setUser(null);
       setGameState(null);
+      setRoomData(null);
+      setMissionData(null);
+      setSolvedPuzzles([]);
+      setPlayerStats(null);
       setHasGameProgress(false);
       return false;
     }
@@ -159,6 +221,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       setGameState(null);
+      setRoomData(null);
+      setMissionData(null);
+      setSolvedPuzzles([]);
+      setPlayerStats(null);
       setHasGameProgress(false);
       router.push('/');
     }
@@ -176,6 +242,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         
         // Spielstand im Context aktualisieren
         setGameState(data.gameState);
+        setRoomData(data.roomData);
+        setMissionData(null); // Neues Spiel = keine Mission
+        setSolvedPuzzles([]);
+        setPlayerStats(null);
         setHasGameProgress(false); // Neues Spiel = kein Fortschritt
         
         router.push('/game');
@@ -196,6 +266,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const value: GameContextType = {
     user,
     gameState,
+    roomData,
+    missionData,
+    solvedPuzzles,
+    playerStats,
     isLoading,
     hasGameProgress,
     login,
