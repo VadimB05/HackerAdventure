@@ -12,7 +12,7 @@ export default function IntroStory() {
     if (!hasShownIntro) {
       const introStory = {
         id: "intro",
-        title: "ECHO VOID",
+        title: "INTRUSION",
         type: "text",
         content: [
           "Das Jahr 2031. Die Welt ist ein Netz aus Daten, Geheimnissen und Macht.",
@@ -20,7 +20,7 @@ export default function IntroStory() {
           "Dein Apartment in Moskau ist deine Festung. Von hier aus navigierst du durch das digitale Labyrinth, nimmst Aufträge an und versuchst, deiner Vergangenheit einen Schritt voraus zu sein.",
           "Das Darknet ist dein Marktplatz. Deine Fähigkeiten sind deine Währung. Und Bitcoin ist dein Blut.",
           "Doch die Schatten deiner Vergangenheit werden länger. Jemand hat deine Spur aufgenommen. Jemand, der weiß, wer du wirklich bist.",
-          "Willkommen in ECHO VOID. Deine Entscheidungen werden dein Schicksal bestimmen.",
+          "Willkommen in INTRUSION. Deine Entscheidungen werden dein Schicksal bestimmen.",
         ],
       }
 

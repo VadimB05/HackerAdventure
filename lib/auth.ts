@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { SignJWT, jwtVerify } from 'jose';
 import { jwtConfig } from './config';
 
 // Token-Interface
@@ -10,11 +10,35 @@ export interface JWTPayload {
   exp?: number;
 }
 
-// Token validieren
-export function verifyToken(token: string): JWTPayload | null {
+/**
+ * JWT-Token generieren
+ */
+export async function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string> {
+  const secret = new TextEncoder().encode(jwtConfig.secret);
+  
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(jwtConfig.expiresIn)
+    .sign(secret);
+    
+  return token;
+}
+
+/**
+ * JWT-Token verifizieren
+ */
+export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const decoded = jwt.verify(token, jwtConfig.secret) as JWTPayload;
-    return decoded;
+    const secret = new TextEncoder().encode(jwtConfig.secret);
+    const { payload } = await jwtVerify(token, secret);
+    
+    return {
+      userId: payload.userId as number,
+      username: payload.username as string,
+      iat: payload.iat as number,
+      exp: payload.exp as number
+    };
   } catch (error) {
     console.error('Token-Validierungsfehler:', error);
     return null;
@@ -42,7 +66,7 @@ export async function authenticateRequest(request: NextRequest): Promise<{
       return { user: null, error: 'Kein Token bereitgestellt' };
     }
 
-    const user = verifyToken(token);
+    const user = await verifyToken(token);
     
     if (!user) {
       return { user: null, error: 'Ungültiger Token' };
@@ -72,12 +96,4 @@ export function withAuth(handler: Function) {
     
     return handler(request);
   };
-}
-
-// Token generieren
-export function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, jwtConfig.secret, { 
-    expiresIn: jwtConfig.expiresIn,
-    algorithm: jwtConfig.algorithm
-  });
 } 

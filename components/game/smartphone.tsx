@@ -64,7 +64,7 @@ export default function Smartphone() {
       phoneNumber: "SYSTEM",
       messages: [
         {
-          content: "Dein Account wurde aktiviert. Willkommen bei ECHO VOID.",
+          content: "Dein Account wurde aktiviert. Willkommen bei INTRUSION.",
           timestamp: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 Tage alt
           isIncoming: true,
         },

@@ -31,13 +31,19 @@ export async function closeDB(): Promise<void> {
   }
 }
 
+// Hilfsfunktion um undefined zu null zu konvertieren
+function sanitizeParams(params: any[]): any[] {
+  return params.map(param => param === undefined ? null : param);
+}
+
 // Hilfsfunktion für sichere SQL-Abfragen
 export async function executeQuery<T = any>(
   query: string,
   params: any[] = []
 ): Promise<T[]> {
   const db = await connectDB();
-  const [rows] = await db.execute(query, params);
+  const sanitizedParams = sanitizeParams(params);
+  const [rows] = await db.execute(query, sanitizedParams);
   return rows as T[];
 }
 
@@ -56,6 +62,7 @@ export async function executeUpdate(
   params: any[] = []
 ): Promise<{ insertId?: number; affectedRows: number }> {
   const db = await connectDB();
-  const [result] = await db.execute(query, params);
+  const sanitizedParams = sanitizeParams(params);
+  const [result] = await db.execute(query, sanitizedParams);
   return result as any;
 } 

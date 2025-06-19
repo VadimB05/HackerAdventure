@@ -1,65 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { connectDB } from '@/lib/database';
+import { validateLogin } from '@/lib/validation';
+import { loginUser } from '@/lib/services/auth-service';
 
+/**
+ * Benutzer anmelden
+ * POST /api/auth/login
+ * Body: { username: string, password: string }
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { username, password } = await request.json();
+    const body = await request.json();
 
-    // Validierung der Eingabedaten
-    if (!username || !password) {
-      return NextResponse.json(
-        { error: 'Benutzername und Passwort sind erforderlich' },
-        { status: 400 }
-      );
+    // Eingabedaten validieren
+    const validation = validateLogin(body);
+    
+    if (!validation.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'Validierungsfehler',
+        details: validation.errors
+      }, { status: 400 });
     }
 
-    const db = await connectDB();
+    const { username, password } = validation.data;
 
-    // Benutzer aus Datenbank abrufen
-    const [users] = await db.execute(
-      'SELECT id, username, password_hash FROM users WHERE username = ?',
-      [username]
-    );
+    // Benutzer anmelden
+    const result = await loginUser(username, password);
 
-    if (!Array.isArray(users) || users.length === 0) {
-      return NextResponse.json(
-        { error: 'Ungültige Anmeldedaten' },
-        { status: 401 }
-      );
+    if (!result.success) {
+      return NextResponse.json({
+        success: false,
+        error: result.error
+      }, { status: 401 });
     }
 
-    const user = users[0] as any;
-
-    // Passwort überprüfen
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Ungültige Anmeldedaten' },
-        { status: 401 }
-      );
-    }
-
-    // JWT Token generieren
-    const token = jwt.sign(
-      { userId: user.id, username: user.username },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '24h' }
-    );
-
-    return NextResponse.json({
+    // Erfolgreiche Anmeldung
+    const response = NextResponse.json({
+      success: true,
       message: 'Anmeldung erfolgreich',
-      token,
-      user: { id: user.id, username: user.username }
+      user: {
+        id: result.user!.id,
+        username: result.user!.username,
+        email: result.user!.email,
+        isAdmin: result.user!.isAdmin
+      }
+    }, { status: 200 });
+
+    // JWT-Token als HTTP-Only Cookie setzen
+    response.cookies.set('auth-token', result.token!, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 Stunden
     });
+
+    return response;
 
   } catch (error) {
     console.error('Anmeldefehler:', error);
-    return NextResponse.json(
-      { error: 'Interner Serverfehler' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Interner Serverfehler bei der Anmeldung'
+    }, { status: 500 });
   }
 } 

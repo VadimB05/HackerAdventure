@@ -6,17 +6,23 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function POST(request: NextRequest) {
   try {
-    // JWT-Token aus Cookie entfernen
     const response = NextResponse.json({
       success: true,
       message: 'Erfolgreich abgemeldet'
     }, { status: 200 });
 
-    // Cookie löschen
-    response.cookies.delete('auth-token');
+    // JWT-Token Cookie löschen
+    response.cookies.set('auth-token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0, // Sofort ablaufen
+      expires: new Date(0) // Sofort ablaufen
+    });
     
     return response;
   } catch (error) {
+    console.error('Logout-Fehler:', error);
     return NextResponse.json({
       success: false,
       error: 'Logout fehlgeschlagen'

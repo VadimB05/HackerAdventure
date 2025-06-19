@@ -17,7 +17,7 @@ export default function Terminal() {
     updateBitcoinBalance,
   } = useGameState()
   const [input, setInput] = useState("")
-  const [output, setOutput] = useState<string[]>(["ECHO VOID Terminal v1.0", 'Type "help" for available commands.', ""])
+  const [output, setOutput] = useState<string[]>(["INTRUSION Terminal v1.0", 'Type "help" for available commands.', ""])
   const [showHelp, setShowHelp] = useState(false)
   const terminalRef = useRef<HTMLDivElement>(null)
 
@@ -57,7 +57,7 @@ export default function Terminal() {
         ])
         break
       case "clear":
-        setOutput(["ECHO VOID Terminal v1.0", 'Type "help" for available commands.', ""])
+        setOutput(["INTRUSION Terminal v1.0", 'Type "help" for available commands.', ""])
         break
       case "ls":
         setOutput((prev) => [
