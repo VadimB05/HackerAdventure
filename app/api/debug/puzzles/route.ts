@@ -118,11 +118,11 @@ export async function GET(request: NextRequest) {
         type: puzzle.puzzle_type,
         difficulty: puzzle.difficulty,
         questions: questions,
-        hints: JSON.parse(puzzle.hints || '[]'),
+        hints: Array.isArray(puzzle.hints) ? puzzle.hints : JSON.parse(puzzle.hints || '[]'),
         maxAttempts: puzzle.max_attempts,
         timeLimitSeconds: puzzle.time_limit_seconds,
         rewardExp: puzzle.reward_exp,
-        rewardItems: JSON.parse(puzzle.reward_items || '[]'),
+        rewardItems: Array.isArray(puzzle.reward_items) ? puzzle.reward_items : JSON.parse(puzzle.reward_items || '[]'),
         isRequired: puzzle.is_required,
         isHidden: puzzle.is_hidden,
         dataCount: data.length

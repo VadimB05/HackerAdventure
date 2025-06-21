@@ -6,10 +6,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { puzzleId, questionId, answer, timeSpent } = body;
 
-    if (!puzzleId || !questionId || answer === undefined) {
+    if (!puzzleId || answer === undefined) {
       return NextResponse.json({
         success: false,
-        error: 'puzzleId, questionId und answer sind erforderlich'
+        error: 'puzzleId und answer sind erforderlich'
       }, { status: 400 });
     }
 
@@ -38,98 +38,28 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    // Spezifische Frage abrufen
-    const questionData = await executeQuery<{
-      data_type: string;
-      data_key: string;
-      data_value: string;
-    }>(
-      'SELECT * FROM puzzle_data WHERE puzzle_id = ? AND data_key LIKE ?',
-      [puzzleId, `%_${questionId}`]
-    );
-
-    // Frage-Daten strukturieren
-    const question: any = {
-      id: parseInt(questionId),
-      question: '',
-      options: [],
-      correct_answer: '',
-      explanation: ''
-    };
-
-    questionData.forEach(row => {
-      const parts = row.data_key.split('_');
-      if (parts.length >= 2) {
-        const dataType = parts[0];
-        try {
-          const value = JSON.parse(row.data_value);
-          switch (dataType) {
-            case 'question':
-              question.question = value;
-              break;
-            case 'options':
-              question.options = value;
-              break;
-            case 'correct':
-              question.correct_answer = value;
-              break;
-            case 'explanation':
-              question.explanation = value;
-              break;
-          }
-        } catch {
-          // Fallback für nicht-JSON Werte
-          const value = row.data_value;
-          switch (dataType) {
-            case 'question':
-              question.question = value;
-              break;
-            case 'correct':
-              question.correct_answer = value;
-              break;
-            case 'explanation':
-              question.explanation = value;
-              break;
-          }
-        }
-      }
-    });
+    // Lösung aus dem Rätsel extrahieren
+    let correctAnswer = '';
+    try {
+      const solution = Array.isArray(puzzle.solution) ? puzzle.solution : JSON.parse(puzzle.solution || '[]');
+      correctAnswer = Array.isArray(solution) ? solution[0] : solution;
+    } catch {
+      correctAnswer = puzzle.solution || '';
+    }
 
     // Antwort validieren
-    const isCorrect = answer.toLowerCase() === question.correct_answer?.toLowerCase();
+    const isCorrect = answer.toLowerCase() === correctAnswer.toLowerCase();
     const validationMessage = isCorrect ? 'Richtige Antwort!' : 'Falsche Antwort';
 
-    // Alle Fragen des Rätsels abrufen um zu prüfen ob alle gelöst sind
-    const allQuestions = await executeQuery<{
-      data_key: string;
-    }>(
-      'SELECT DISTINCT data_key FROM puzzle_data WHERE puzzle_id = ? AND data_key LIKE "question_%"',
-      [puzzleId]
-    );
-
-    const totalQuestions = allQuestions.length;
-    
-    // Bereits gelöste Fragen aus der Session abrufen (für Debug-Zwecke)
-    // In einer vollständigen Implementierung würden wir das in der Datenbank speichern
-    const completedQuestions = isCorrect ? [questionId.toString()] : [];
-    
-    // Das Rätsel ist vollständig gelöst, wenn alle Fragen beantwortet wurden
-    // Für Debug-Zwecke: Wenn die aktuelle Frage richtig ist UND es die letzte Frage ist
-    const questionNumbers = allQuestions.map(q => {
-      const parts = q.data_key.split('_');
-      return parseInt(parts[parts.length - 1]);
-    }).sort((a, b) => a - b);
-    
-    const currentQuestionNumber = parseInt(questionId);
-    const isLastQuestion = currentQuestionNumber === Math.max(...questionNumbers);
-    const allCompleted = isCorrect && isLastQuestion;
+    // Für Code-Rätsel: Rätsel ist gelöst, wenn die Antwort richtig ist
+    const allCompleted = isCorrect;
 
     // Belohnungen nur bei vollständiger Lösung
     let rewards = null;
     if (allCompleted) {
       rewards = {
         exp: puzzle.reward_exp,
-        items: JSON.parse(puzzle.reward_items || '[]')
+        items: Array.isArray(puzzle.reward_items) ? puzzle.reward_items : JSON.parse(puzzle.reward_items || '[]')
       };
     }
 
@@ -139,11 +69,10 @@ export async function POST(request: NextRequest) {
       message: validationMessage,
       attempts: 1, // Debug: Immer 1 Versuch
       maxAttempts: puzzle.max_attempts,
-      completedQuestions,
-      totalQuestions,
+      completedQuestions: isCorrect ? ['1'] : [],
+      totalQuestions: 1, // Code-Rätsel haben nur eine "Frage"
       allCompleted,
-      rewards,
-      explanation: isCorrect ? question.explanation : null
+      rewards
     });
 
   } catch (error) {
