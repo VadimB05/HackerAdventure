@@ -5,12 +5,12 @@ import crypto from 'crypto';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { puzzleId: string } }
+  { params }: { params: Promise<{ puzzleId: string }> }
 ) {
   return requireAuth(async (req) => {
     try {
       const userId = req.user!.id;
-      const puzzleId = params.puzzleId;
+      const { puzzleId } = await params;
       const body = await request.json();
       const { answer, timeSpent } = body;
 

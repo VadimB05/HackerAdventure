@@ -425,7 +425,7 @@ export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle }
 
   const handleSave = () => {
     if (!puzzle.name || !puzzle.puzzleId) {
-      alert('Name und Puzzle-ID sind erforderlich');
+      console.error('Name und Puzzle-ID sind erforderlich');
       return;
     }
 

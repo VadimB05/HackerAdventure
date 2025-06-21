@@ -31,7 +31,6 @@ export async function GET(
         hints: string;
         max_attempts: number;
         time_limit_seconds: number | null;
-        reward_money: number;
         reward_exp: number;
         reward_items: string;
         is_required: boolean;
@@ -48,14 +47,14 @@ export async function GET(
         }, { status: 404 });
       }
 
-      // Rätsel-spezifische Daten abrufen
+      // Rätsel-spezifische Daten abrufen (mehrere Fragen)
       const puzzleData = await executeQuery<{
         id: number;
         data_type: string;
         data_key: string;
         data_value: string;
       }>(
-        'SELECT * FROM puzzle_data WHERE puzzle_id = ? ORDER BY data_type, data_key',
+        'SELECT * FROM puzzle_data WHERE puzzle_id = ? ORDER BY data_key',
         [puzzleId]
       );
 
@@ -71,18 +70,72 @@ export async function GET(
         [userId, puzzleId]
       );
 
-      // Rätsel-spezifische Daten strukturieren
-      const structuredData: any = {};
+      // Fragen strukturieren
+      const questions: any[] = [];
+      const questionMap = new Map<number, any>();
+
+      // Alle Fragen-IDs extrahieren
       puzzleData.forEach(row => {
-        if (!structuredData[row.data_type]) {
-          structuredData[row.data_type] = {};
-        }
-        try {
-          structuredData[row.data_type][row.data_key] = JSON.parse(row.data_value);
-        } catch {
-          structuredData[row.data_type][row.data_key] = row.data_value;
+        if (row.data_key.startsWith('question_')) {
+          const questionId = parseInt(row.data_key.split('_')[1]);
+          if (!questionMap.has(questionId)) {
+            questionMap.set(questionId, {
+              id: questionId,
+              question: '',
+              options: [],
+              correct_answer: '',
+              explanation: ''
+            });
+          }
         }
       });
+
+      // Daten zu Fragen zuordnen
+      puzzleData.forEach(row => {
+        const parts = row.data_key.split('_');
+        if (parts.length >= 2) {
+          const questionId = parseInt(parts[1]);
+          const dataType = parts[0];
+          const question = questionMap.get(questionId);
+          
+          if (question) {
+            try {
+              const value = JSON.parse(row.data_value);
+              switch (dataType) {
+                case 'question':
+                  question.question = value;
+                  break;
+                case 'options':
+                  question.options = value;
+                  break;
+                case 'correct':
+                  question.correct_answer = value;
+                  break;
+                case 'explanation':
+                  question.explanation = value;
+                  break;
+              }
+            } catch {
+              // Fallback für nicht-JSON Werte
+              const value = row.data_value;
+              switch (dataType) {
+                case 'question':
+                  question.question = value;
+                  break;
+                case 'correct':
+                  question.correct_answer = value;
+                  break;
+                case 'explanation':
+                  question.explanation = value;
+                  break;
+              }
+            }
+          }
+        }
+      });
+
+      // Fragen nach ID sortieren
+      questions.push(...Array.from(questionMap.values()).sort((a, b) => a.id - b.id));
 
       // Rätsel-Response zusammenstellen
       const puzzleResponse = {
@@ -92,28 +145,28 @@ export async function GET(
         description: puzzle.description,
         type: puzzle.puzzle_type,
         difficulty: puzzle.difficulty,
-        solution: JSON.parse(puzzle.solution),
+        questions: questions,
         hints: JSON.parse(puzzle.hints || '[]'),
         maxAttempts: puzzle.max_attempts,
         timeLimitSeconds: puzzle.time_limit_seconds,
-        rewardMoney: puzzle.reward_money,
         rewardExp: puzzle.reward_exp,
         rewardItems: JSON.parse(puzzle.reward_items || '[]'),
         isRequired: puzzle.is_required,
         isHidden: puzzle.is_hidden,
-        data: structuredData,
         progress: progress ? {
           isCompleted: progress.is_completed,
           attempts: progress.attempts,
           bestTimeSeconds: progress.best_time_seconds,
           completedAt: progress.completed_at,
-          hintsUsed: progress.hints_used
+          hintsUsed: progress.hints_used,
+          completedQuestions: []
         } : {
           isCompleted: false,
           attempts: 0,
           bestTimeSeconds: null,
           completedAt: null,
-          hintsUsed: 0
+          hintsUsed: 0,
+          completedQuestions: []
         }
       };
 
