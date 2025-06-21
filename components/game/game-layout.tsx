@@ -16,9 +16,85 @@ import CityView from "./city-view" // Neue Komponente für die Stadt
 import RoomView from "./room-view"
 import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
+import { useState } from "react"
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  type: 'tool' | 'key' | 'document' | 'consumable' | 'equipment' | 'weapon' | 'armor';
+  quantity: number;
+  description: string;
+  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  icon?: string;
+}
 
 export default function GameLayout() {
   const { currentView, setCurrentView } = useGameState()
+  
+  // Mock-Inventardaten für Test
+  const [inventory, setInventory] = useState<InventoryItem[]>([
+    {
+      id: 'laptop',
+      name: 'Laptop',
+      type: 'tool',
+      quantity: 1,
+      description: 'Ein alter aber funktionsfähiger Laptop',
+      rarity: 'common',
+      icon: 'Laptop'
+    },
+    {
+      id: 'usb_stick',
+      name: 'USB-Stick',
+      type: 'tool',
+      quantity: 2,
+      description: 'Ein USB-Stick mit unbekanntem Inhalt',
+      rarity: 'uncommon',
+      icon: 'Usb'
+    },
+    {
+      id: 'keycard',
+      name: 'Zugangskarte',
+      type: 'key',
+      quantity: 1,
+      description: 'Eine magnetische Zugangskarte',
+      rarity: 'rare',
+      icon: 'Key'
+    },
+    {
+      id: 'hacking_manual',
+      name: 'Hacking-Handbuch',
+      type: 'document',
+      quantity: 1,
+      description: 'Ein detailliertes Handbuch für ethisches Hacking',
+      rarity: 'uncommon',
+      icon: 'BookOpen'
+    },
+    {
+      id: 'energy_drink',
+      name: 'Energy Drink',
+      type: 'consumable',
+      quantity: 3,
+      description: 'Gibt dir Energie für längere Hacking-Sessions',
+      rarity: 'common',
+      icon: 'Battery'
+    }
+  ]);
+
+  const handleItemUse = (item: InventoryItem, target: any) => {
+    console.log(`Item ${item.name} wird auf ${target.name} verwendet`);
+    
+    // Hier könnte die Logik für das Verwenden von Items implementiert werden
+    // Zum Beispiel: Item aus Inventar entfernen, neue Funktionen freischalten, etc.
+    
+    // Beispiel: Energy Drink wird konsumiert
+    if (item.id === 'energy_drink') {
+      setInventory(prev => prev.map(invItem => 
+        invItem.id === item.id 
+          ? { ...invItem, quantity: Math.max(0, invItem.quantity - 1) }
+          : invItem
+      ).filter(invItem => invItem.quantity > 0));
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen bg-black text-green-500 font-mono">
@@ -98,7 +174,13 @@ export default function GameLayout() {
 
       {/* Main game content area */}
       <main className="flex-1 overflow-hidden">
-        {currentView === "apartment" && <RoomView roomId="intro" />}
+        {currentView === "apartment" && (
+          <RoomView 
+            roomId="intro" 
+            inventory={inventory}
+            onItemUse={handleItemUse}
+          />
+        )}
         {currentView === "terminal" && <Terminal />}
         {currentView === "smartphone" && <Smartphone />}
         {currentView === "darkroom" && <DarknetChat />}

@@ -91,6 +91,38 @@ const config: Config = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Benutzerdefinierte Scrollbar-Styles
+    function({ addUtilities }: any) {
+      const newUtilities = {
+        '.scrollbar-thin': {
+          'scrollbar-width': 'thin',
+          'scrollbar-color': 'rgb(75 85 99) transparent',
+        },
+        '.scrollbar-thumb-gray-600': {
+          'scrollbar-color': 'rgb(75 85 99) transparent',
+        },
+        '.scrollbar-track-transparent': {
+          'scrollbar-color': 'rgb(75 85 99) transparent',
+        },
+        // Webkit-spezifische Scrollbar-Styles
+        '.scrollbar-thin::-webkit-scrollbar': {
+          width: '6px',
+        },
+        '.scrollbar-thin::-webkit-scrollbar-track': {
+          background: 'transparent',
+        },
+        '.scrollbar-thin::-webkit-scrollbar-thumb': {
+          background: 'rgb(75 85 99)',
+          borderRadius: '3px',
+        },
+        '.scrollbar-thin::-webkit-scrollbar-thumb:hover': {
+          background: 'rgb(107 114 128)',
+        },
+      }
+      addUtilities(newUtilities)
+    }
+  ],
 };
 export default config;

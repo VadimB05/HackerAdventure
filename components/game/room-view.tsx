@@ -9,6 +9,18 @@ import { useGameState } from './game-context';
 import SmartphoneOverlay from './smartphone-overlay';
 import ChoicePopup from './choice-popup';
 import MessagePopup from './message-popup';
+import InventoryBar from './inventory-bar';
+import DragDropFeedback from './drag-drop-feedback';
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  type: 'tool' | 'key' | 'document' | 'consumable' | 'equipment' | 'weapon' | 'armor';
+  quantity: number;
+  description: string;
+  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  icon?: string;
+}
 
 interface InteractiveObject {
   id: string;
@@ -24,15 +36,26 @@ interface InteractiveObject {
   icon?: string;
   status?: 'completed' | 'locked' | 'available' | 'hidden';
   quantity?: number;
+  // Drag-and-Drop Kompatibilität
+  compatibleItems?: string[]; // Array von Item-IDs die kompatibel sind
+  requiredItems?: string[]; // Array von Item-IDs die benötigt werden
 }
 
 interface RoomViewProps {
   roomId: string;
   onObjectClick?: (object: InteractiveObject) => void;
   onExitClick?: (exitId: string) => void;
+  inventory?: InventoryItem[];
+  onItemUse?: (item: InventoryItem, target: InteractiveObject) => void;
 }
 
-export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomViewProps) {
+export default function RoomView({ 
+  roomId, 
+  onObjectClick, 
+  onExitClick, 
+  inventory = [],
+  onItemUse 
+}: RoomViewProps) {
   const { setCurrentView } = useGameState();
   const [hoveredObject, setHoveredObject] = useState<string | null>(null);
   const [tooltipData, setTooltipData] = useState<InteractiveObject | null>(null);
@@ -42,6 +65,55 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
   const [isComputerPopupOpen, setIsComputerPopupOpen] = useState(false);
   const [isDoorPopupOpen, setIsDoorPopupOpen] = useState(false);
   const [isWindowPopupOpen, setIsWindowPopupOpen] = useState(false);
+
+  // Drag-and-Drop States
+  const [draggedItem, setDraggedItem] = useState<InventoryItem | null>(null);
+  const [dragOverObject, setDragOverObject] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackData, setFeedbackData] = useState<{
+    isValid: boolean;
+    message: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  // Feedback Timer Ref
+  const feedbackTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup Timer beim Unmount
+  React.useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+    };
+  }, []);
+
+  const clearFeedback = () => {
+    setShowFeedback(false);
+    setFeedbackData(null);
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
+  };
+
+  const showFeedbackWithTimer = (data: {
+    isValid: boolean;
+    message: string;
+    position: { x: number; y: number };
+  }) => {
+    // Vorheriges Feedback löschen
+    clearFeedback();
+    
+    // Neues Feedback setzen
+    setFeedbackData(data);
+    setShowFeedback(true);
+    
+    // Timer für automatisches Ausblenden
+    feedbackTimerRef.current = setTimeout(() => {
+      clearFeedback();
+    }, 2000);
+  };
 
   // Mock-Raumdaten für das eigene Zimmer
   const roomData = {
@@ -60,7 +132,9 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
         width: 20,
         height: 15,
         status: 'available',
-        icon: 'Zap'
+        icon: 'Zap',
+        compatibleItems: ['laptop', 'usb_stick', 'hacking_manual'],
+        requiredItems: []
       },
       {
         id: 'window',
@@ -72,7 +146,9 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
         width: 25,
         height: 20,
         status: 'available',
-        icon: 'Eye'
+        icon: 'Eye',
+        compatibleItems: ['keycard', 'hacking_manual'],
+        requiredItems: []
       },
       {
         id: 'smartphone',
@@ -84,7 +160,9 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
         width: 12,
         height: 8,
         status: 'available',
-        icon: 'Package'
+        icon: 'Package',
+        compatibleItems: ['usb_stick', 'energy_drink'],
+        requiredItems: []
       },
       {
         id: 'door',
@@ -95,7 +173,9 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
         y: 20,
         width: 12,
         height: 18,
-        icon: 'DoorOpen'
+        icon: 'DoorOpen',
+        compatibleItems: ['keycard'],
+        requiredItems: ['keycard']
       }
     ]
   };
@@ -105,6 +185,93 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
     isVisible: true,
     isInteractable: true
   }));
+
+  // Drag-and-Drop Handler
+  const handleDragStart = (item: InventoryItem, event: React.DragEvent) => {
+    setDraggedItem(item);
+    event.dataTransfer.setData('application/json', JSON.stringify(item));
+    event.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleDragEnd = (event: React.DragEvent) => {
+    setDraggedItem(null);
+    setDragOverObject(null);
+  };
+
+  const handleDragOver = (event: React.DragEvent, object: InteractiveObject) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setDragOverObject(object.id);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    setDragOverObject(null);
+  };
+
+  const handleDrop = (event: React.DragEvent, object: InteractiveObject) => {
+    event.preventDefault();
+    
+    try {
+      const itemData = event.dataTransfer.getData('application/json');
+      const droppedItem: InventoryItem = JSON.parse(itemData);
+      
+      // Prüfen ob Item kompatibel ist
+      const isCompatible = object.compatibleItems?.includes(droppedItem.id) || false;
+      const isRequired = object.requiredItems?.includes(droppedItem.id) || false;
+      
+      // Position für Feedback berechnen
+      const rect = event.currentTarget.getBoundingClientRect();
+      const position = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+      
+      if (isCompatible || isRequired) {
+        // Erfolgreiche Interaktion
+        showFeedbackWithTimer({
+          isValid: true,
+          message: isRequired ? 'Item benötigt!' : 'Item kompatibel!',
+          position
+        });
+        
+        // Item verwenden
+        onItemUse?.(droppedItem, object);
+        
+        // Eventuelle Aktionen basierend auf Item und Objekt
+        handleItemUse(droppedItem, object);
+      } else {
+        // Nicht kompatible Interaktion
+        showFeedbackWithTimer({
+          isValid: false,
+          message: 'Item nicht kompatibel',
+          position
+        });
+      }
+      
+    } catch (error) {
+      console.error('Fehler beim Verarbeiten des gedropten Items:', error);
+    }
+    
+    setDraggedItem(null);
+    setDragOverObject(null);
+  };
+
+  const handleItemUse = (item: InventoryItem, object: InteractiveObject) => {
+    // Spezifische Logik für verschiedene Item-Objekt-Kombinationen
+    console.log(`Item ${item.name} wird auf ${object.name} verwendet`);
+    
+    // Beispiel-Logik für verschiedene Kombinationen
+    if (object.id === 'computer' && item.id === 'usb_stick') {
+      console.log('USB-Stick wird in Computer eingesteckt');
+      // Hier könnte ein neues Rätsel oder eine neue Funktion freigeschaltet werden
+    } else if (object.id === 'door' && item.id === 'keycard') {
+      console.log('Tür wird mit Zugangskarte geöffnet');
+      // Tür könnte geöffnet werden
+    } else if (object.id === 'smartphone' && item.id === 'energy_drink') {
+      console.log('Energy Drink wird konsumiert');
+      // Spieler könnte Energie bekommen
+    }
+  };
 
   // Objekt-Klick-Handler
   const handleObjectClick = (object: InteractiveObject) => {
@@ -190,6 +357,8 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
               object.isInteractable 
                 ? 'hover:scale-110 hover:brightness-125' 
                 : 'opacity-50 cursor-not-allowed'
+            } ${
+              dragOverObject === object.id ? 'ring-2 ring-cyan-400 ring-opacity-75' : ''
             }`}
             style={{
               left: `${object.x}%`,
@@ -200,6 +369,9 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
             onClick={() => handleObjectClick(object)}
             onMouseEnter={(e) => handleObjectHover(object, e)}
             onMouseLeave={handleObjectLeave}
+            onDragOver={(e) => handleDragOver(e, object)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, object)}
           >
             {/* Objekt-Icon */}
             <div className={`relative w-full h-full flex items-center justify-center ${
@@ -207,7 +379,9 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
               object.status === 'locked' ? 'text-red-400' :
               'text-cyan-400'
             }`}>
-              <div className="bg-black/50 backdrop-blur-sm rounded-lg p-2 border border-current/30 hover:bg-black/70 transition-colors">
+              <div className={`bg-black/50 backdrop-blur-sm rounded-lg p-2 border border-current/30 hover:bg-black/70 transition-colors ${
+                dragOverObject === object.id ? 'bg-cyan-500/20 border-cyan-400' : ''
+              }`}>
                 {object.icon === 'Zap' && <Zap className="h-6 w-6" />}
                 {object.icon === 'Eye' && <Eye className="h-6 w-6" />}
                 {object.icon === 'Puzzle' && <Puzzle className="h-6 w-6" />}
@@ -225,10 +399,34 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
                   ✓
                 </Badge>
               )}
+              
+              {/* Drag-Over Indicator */}
+              {dragOverObject === object.id && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="absolute inset-0 bg-cyan-400/20 rounded-lg border-2 border-cyan-400"
+                />
+              )}
             </div>
           </motion.div>
         ))}
       </div>
+
+      {/* Inventar-Leiste */}
+      <InventoryBar 
+        items={inventory}
+        onItemDragStart={handleDragStart}
+        onItemDragEnd={handleDragEnd}
+      />
+
+      {/* Drag-and-Drop Feedback */}
+      <DragDropFeedback
+        isVisible={showFeedback}
+        isValid={feedbackData?.isValid || false}
+        message={feedbackData?.message}
+        position={feedbackData?.position}
+      />
 
       {/* Notify-Fenster rechts mittig */}
       <AnimatePresence>
@@ -284,6 +482,13 @@ export default function RoomView({ roomId, onObjectClick, onExitClick }: RoomVie
                         </Badge>
                       )}
                     </div>
+                    
+                    {/* Drag-and-Drop Hinweis */}
+                    {tooltipData.compatibleItems && tooltipData.compatibleItems.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-400">
+                        <p>Kompatible Items: {tooltipData.compatibleItems.join(', ')}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
