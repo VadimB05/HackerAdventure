@@ -72,7 +72,7 @@ CREATE TABLE puzzles (
     room_id VARCHAR(100) NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    puzzle_type ENUM('terminal', 'point_and_click', 'logic', 'password', 'sequence', 'pattern') NOT NULL,
+    puzzle_type ENUM('terminal', 'point_and_click', 'logic', 'password', 'sequence', 'pattern', 'multiple_choice', 'code', 'terminal_command') NOT NULL,
     difficulty INT DEFAULT 1, -- 1-5
     solution JSON NOT NULL, -- Verschiedene Lösungswege
     hints JSON DEFAULT '[]',
@@ -91,6 +91,21 @@ CREATE TABLE puzzles (
     INDEX idx_puzzle_type (puzzle_type),
     INDEX idx_difficulty (difficulty),
     INDEX idx_is_required (is_required)
+);
+
+-- Rätsel-spezifische Daten (für verschiedene Rätseltypen)
+CREATE TABLE puzzle_data (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    puzzle_id VARCHAR(100) NOT NULL,
+    data_type ENUM('multiple_choice', 'code', 'terminal', 'password', 'sequence', 'pattern') NOT NULL,
+    data_key VARCHAR(100) NOT NULL, -- z.B. 'question', 'options', 'correct_answer', 'allowed_commands'
+    data_value JSON NOT NULL, -- Speichert die spezifischen Daten je nach Typ
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (puzzle_id) REFERENCES puzzles(puzzle_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_puzzle_data_key (puzzle_id, data_type, data_key),
+    INDEX idx_puzzle_id (puzzle_id),
+    INDEX idx_data_type (data_type)
 );
 
 -- Spielstände-Tabelle (erweitert)
