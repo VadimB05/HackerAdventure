@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     try {
       const userId = req.user!.id;
       const { searchParams } = new URL(request.url);
-      const roomId = searchParams.get('roomId');
+      const roomId = searchParams.get('roomId') || searchParams.get('id');
 
       // Validierung der Eingabeparameter
       if (!roomId) {
@@ -25,6 +25,72 @@ export async function GET(request: NextRequest) {
           success: false,
           error: 'roomId Parameter ist erforderlich'
         }, { status: 400 });
+      }
+
+      // Prüfen ob nur Items abgerufen werden sollen
+      const itemsOnly = searchParams.get('items') === 'true';
+
+      if (itemsOnly) {
+        // Nur Items im Raum abrufen
+        const roomItems = await executeQuery<{
+          id: number;
+          item_id: string;
+          quantity: number;
+          position_x: number;
+          position_y: number;
+          name: string;
+          description: string;
+          type: string;
+          rarity: string;
+          value: number;
+          is_stackable: boolean;
+          max_stack_size: number;
+          icon: string | null;
+        }>(
+          `SELECT 
+            ri.id,
+            ri.item_id,
+            ri.quantity,
+            ri.position_x,
+            ri.position_y,
+            i.name,
+            i.description,
+            i.type,
+            i.rarity,
+            i.value,
+            i.is_stackable,
+            i.max_stack_size,
+            i.icon
+          FROM room_items ri
+          JOIN items i ON ri.item_id = i.id
+          WHERE ri.room_id = ? AND ri.is_available = true
+          ORDER BY ri.created_at DESC`,
+          [roomId]
+        );
+
+        // Items in das erwartete Format konvertieren
+        const items = roomItems.map(row => ({
+          id: row.item_id,
+          name: row.name,
+          type: row.type,
+          quantity: row.quantity,
+          description: row.description,
+          rarity: row.rarity,
+          value: row.value,
+          isStackable: row.is_stackable,
+          maxStackSize: row.max_stack_size,
+          icon: row.icon,
+          position: {
+            x: row.position_x,
+            y: row.position_y
+          }
+        }));
+
+        return NextResponse.json({
+          success: true,
+          items,
+          count: items.length
+        });
       }
 
       // Raumdaten aus der Datenbank abrufen
@@ -100,26 +166,39 @@ export async function GET(request: NextRequest) {
       );
 
       // Items in diesem Raum abrufen
-      const items = await executeQuery<{
+      const roomItems = await executeQuery<{
         id: number;
         item_id: string;
+        quantity: number;
+        position_x: number;
+        position_y: number;
         name: string;
         description: string;
-        item_type: string;
+        type: string;
         rarity: string;
         value: number;
-        is_tradeable: boolean;
         is_stackable: boolean;
         max_stack_size: number;
-        durability: number | null;
-        effects: string;
-        quantity: number;
+        icon: string | null;
       }>(
-        `SELECT i.*, ri.quantity
-         FROM room_items ri
-         JOIN items i ON i.item_id = ri.item_id
-         WHERE ri.room_id = ?
-         ORDER BY i.rarity DESC, i.value DESC`,
+        `SELECT 
+          ri.id,
+          ri.item_id,
+          ri.quantity,
+          ri.position_x,
+          ri.position_y,
+          i.name,
+          i.description,
+          i.type,
+          i.rarity,
+          i.value,
+          i.is_stackable,
+          i.max_stack_size,
+          i.icon
+        FROM room_items ri
+        JOIN items i ON ri.item_id = i.id
+        WHERE ri.room_id = ? AND ri.is_available = true
+        ORDER BY ri.created_at DESC`,
         [roomId]
       );
 
@@ -205,22 +284,24 @@ export async function GET(request: NextRequest) {
       });
 
       // Items formatieren
-      const formattedItems = items.map(item => ({
-        itemId: item.item_id,
-        name: item.name,
-        description: item.description,
-        itemType: item.item_type,
-        rarity: item.rarity,
-        value: item.value,
-        isTradeable: item.is_tradeable,
-        isStackable: item.is_stackable,
-        maxStackSize: item.max_stack_size,
-        durability: item.durability,
-        effects: JSON.parse(item.effects || '[]'),
-        quantity: item.quantity
+      const items = roomItems.map(row => ({
+        id: row.item_id,
+        name: row.name,
+        type: row.type,
+        quantity: row.quantity,
+        description: row.description,
+        rarity: row.rarity,
+        value: row.value,
+        isStackable: row.is_stackable,
+        maxStackSize: row.max_stack_size,
+        icon: row.icon,
+        position: {
+          x: row.position_x,
+          y: row.position_y
+        }
       }));
 
-      // Missiondaten formatieren
+      // Mission formatieren
       const formattedMissionData = missionData ? {
         missionId: missionData.mission_id,
         name: missionData.name,
@@ -235,16 +316,16 @@ export async function GET(request: NextRequest) {
         success: true,
         room: parsedRoomData,
         puzzles: formattedPuzzles,
-        items: formattedItems,
+        items: items,
         mission: formattedMissionData,
         userLevel: userLevel?.level || 1
-      }, { status: 200 });
+      });
 
     } catch (error) {
       console.error('Fehler beim Abrufen der Raumdaten:', error);
       return NextResponse.json({
         success: false,
-        error: 'Interner Serverfehler'
+        error: 'Interner Server-Fehler'
       }, { status: 500 });
     }
   })(request);
