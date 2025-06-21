@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,16 +11,7 @@ import ChoicePopup from './choice-popup';
 import MessagePopup from './message-popup';
 import InventoryBar from './inventory-bar';
 import DragDropFeedback from './drag-drop-feedback';
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  type: 'tool' | 'key' | 'document' | 'consumable' | 'equipment' | 'weapon' | 'armor';
-  quantity: number;
-  description: string;
-  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  icon?: string;
-}
+import { pickItem, getRoomItems, type InventoryItem } from '@/lib/services/inventory-service';
 
 interface InteractiveObject {
   id: string;
@@ -47,6 +38,7 @@ interface RoomViewProps {
   onExitClick?: (exitId: string) => void;
   inventory?: InventoryItem[];
   onItemUse?: (item: InventoryItem, target: InteractiveObject) => void;
+  onInventoryUpdate?: (inventory: InventoryItem[]) => void;
 }
 
 export default function RoomView({ 
@@ -54,7 +46,8 @@ export default function RoomView({
   onObjectClick, 
   onExitClick, 
   inventory = [],
-  onItemUse 
+  onItemUse,
+  onInventoryUpdate
 }: RoomViewProps) {
   const { setCurrentView } = useGameState();
   const [hoveredObject, setHoveredObject] = useState<string | null>(null);
@@ -76,6 +69,10 @@ export default function RoomView({
     position: { x: number; y: number };
   } | null>(null);
 
+  // Room Items State
+  const [roomItems, setRoomItems] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   // Feedback Timer Ref
   const feedbackTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -87,6 +84,22 @@ export default function RoomView({
       }
     };
   }, []);
+
+  // Raum-Items beim Laden abrufen
+  useEffect(() => {
+    loadRoomItems();
+  }, [roomId]);
+
+  const loadRoomItems = async () => {
+    try {
+      const result = await getRoomItems(roomId);
+      if (result.success && result.items) {
+        setRoomItems(result.items);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Raum-Items:', error);
+    }
+  };
 
   const clearFeedback = () => {
     setShowFeedback(false);
@@ -113,6 +126,57 @@ export default function RoomView({
     feedbackTimerRef.current = setTimeout(() => {
       clearFeedback();
     }, 2000);
+  };
+
+  // Item aufheben Funktion
+  const handlePickItem = async (item: InventoryItem, position: { x: number; y: number }) => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const result = await pickItem({
+        itemId: item.id,
+        roomId: roomId
+      });
+
+      if (result.success) {
+        // Erfolgreich aufgesammelt
+        showFeedbackWithTimer({
+          isValid: true,
+          message: result.message || `${item.name} aufgesammelt!`,
+          position
+        });
+
+        // Inventar aktualisieren
+        if (result.inventory && onInventoryUpdate) {
+          onInventoryUpdate(result.inventory);
+        }
+
+        // Item aus Raum-Items entfernen
+        setRoomItems(prev => prev.filter(roomItem => roomItem.id !== item.id));
+
+        // Eventuell Raum-Objekte aktualisieren (falls Item Teil eines Rätsels war)
+        // Hier könnte Logik für Rätsel-Entwicklung implementiert werden
+
+      } else {
+        // Fehler beim Aufsammeln
+        showFeedbackWithTimer({
+          isValid: false,
+          message: result.error || 'Fehler beim Aufsammeln',
+          position
+        });
+      }
+    } catch (error) {
+      console.error('Fehler beim Aufsammeln des Items:', error);
+      showFeedbackWithTimer({
+        isValid: false,
+        message: 'Netzwerkfehler beim Aufsammeln',
+        position
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Mock-Raumdaten für das eigene Zimmer
@@ -278,6 +342,20 @@ export default function RoomView({
     console.log('Object clicked:', object.id, object.type);
     if (!object.isInteractable) return;
     
+    // Prüfen ob es ein aufhebbares Item ist
+    const roomItem = roomItems.find(item => item.id === object.id);
+    if (roomItem) {
+      // Item aufheben
+      const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
+      const position = rect ? {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      } : { x: 50, y: 50 };
+      
+      handlePickItem(roomItem, position);
+      return;
+    }
+    
     // Verbinde mit den vorhandenen Komponenten
     switch (object.id) {
       case 'computer':
@@ -366,6 +444,7 @@ export default function RoomView({
               width: `${object.width}%`,
               height: `${object.height}%`,
             }}
+            data-object-id={object.id}
             onClick={() => handleObjectClick(object)}
             onMouseEnter={(e) => handleObjectHover(object, e)}
             onMouseLeave={handleObjectLeave}
@@ -411,6 +490,70 @@ export default function RoomView({
             </div>
           </motion.div>
         ))}
+
+        {/* Aufhebbare Items im Raum */}
+        <AnimatePresence>
+          {roomItems.map((item) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.3 }}
+              className="absolute cursor-pointer transition-all duration-200 hover:scale-110 hover:brightness-125"
+              style={{
+                left: `${Math.random() * 60 + 20}%`, // Zufällige Position
+                top: `${Math.random() * 60 + 20}%`,
+                width: '8%',
+                height: '8%',
+              }}
+              data-object-id={item.id}
+              onClick={() => {
+                const rect = document.querySelector(`[data-object-id="${item.id}"]`)?.getBoundingClientRect();
+                const position = rect ? {
+                  x: rect.left + rect.width / 2,
+                  y: rect.top + rect.height / 2
+                } : { x: 50, y: 50 };
+                handlePickItem(item, position);
+              }}
+              onMouseEnter={(e) => {
+                setHoveredObject(item.id);
+                setTooltipData({
+                  id: item.id,
+                  type: 'item',
+                  name: item.name,
+                  description: `Klicken um ${item.name} aufzuheben`,
+                  x: 0,
+                  y: 0,
+                  width: 0,
+                  height: 0,
+                  isVisible: true,
+                  isInteractable: true,
+                  quantity: item.quantity
+                });
+              }}
+              onMouseLeave={handleObjectLeave}
+            >
+              <div className="relative w-full h-full flex items-center justify-center">
+                <div className="bg-black/50 backdrop-blur-sm rounded-lg p-2 border-2 border-green-500 text-green-400 hover:bg-black/70 transition-colors animate-pulse">
+                  <Package className="h-6 w-6" />
+                </div>
+                
+                {/* Quantity Badge */}
+                {item.quantity > 1 && (
+                  <Badge className="absolute -top-1 -right-1 bg-green-600 text-white text-xs min-w-0 px-1 h-4 leading-none">
+                    {item.quantity}
+                  </Badge>
+                )}
+                
+                {/* Rarity Indicator */}
+                {item.rarity && item.rarity !== 'common' && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-400 opacity-80" />
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Inventar-Leiste */}
@@ -427,6 +570,18 @@ export default function RoomView({
         message={feedbackData?.message}
         position={feedbackData?.position}
       />
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-black/80 border border-green-500 rounded-lg p-4">
+            <div className="text-green-400 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+              <p className="text-sm">Item wird aufgesammelt...</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notify-Fenster rechts mittig */}
       <AnimatePresence>
@@ -446,6 +601,7 @@ export default function RoomView({
                   <div className={`p-2 rounded-lg ${
                     tooltipData.status === 'completed' ? 'bg-green-500/20 text-green-400' :
                     tooltipData.status === 'locked' ? 'bg-red-500/20 text-red-400' :
+                    tooltipData.type === 'item' ? 'bg-green-500/20 text-green-400' :
                     'bg-cyan-500/20 text-cyan-400'
                   }`}>
                     {tooltipData.icon === 'Zap' && <Zap className="h-5 w-5" />}
@@ -457,6 +613,7 @@ export default function RoomView({
                     {tooltipData.icon === 'MapPin' && <MapPin className="h-5 w-5" />}
                     {tooltipData.icon === 'Coins' && <Coins className="h-5 w-5" />}
                     {tooltipData.icon === 'DoorOpen' && <DoorOpen className="h-5 w-5" />}
+                    {tooltipData.type === 'item' && <Package className="h-5 w-5" />}
                   </div>
                   
                   {/* Content */}
@@ -472,13 +629,18 @@ export default function RoomView({
                         </Badge>
                       )}
                       {tooltipData.type === 'item' && (
-                        <Badge variant="outline" className="text-xs">
-                          Menge: {tooltipData.quantity || 1}
+                        <Badge variant="outline" className="text-xs text-green-400 border-green-400">
+                          Aufhebbar
                         </Badge>
                       )}
                       {tooltipData.type === 'exit' && (
                         <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
                           Ausgang
+                        </Badge>
+                      )}
+                      {tooltipData.quantity && tooltipData.quantity > 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          Menge: {tooltipData.quantity}
                         </Badge>
                       )}
                     </div>

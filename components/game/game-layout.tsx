@@ -16,69 +16,87 @@ import CityView from "./city-view" // Neue Komponente für die Stadt
 import RoomView from "./room-view"
 import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
-import { useState } from "react"
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  type: 'tool' | 'key' | 'document' | 'consumable' | 'equipment' | 'weapon' | 'armor';
-  quantity: number;
-  description: string;
-  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-  icon?: string;
-}
+import { useState, useEffect } from "react"
+import { getInventory, type InventoryItem } from "@/lib/services/inventory-service"
 
 export default function GameLayout() {
   const { currentView, setCurrentView } = useGameState()
   
-  // Mock-Inventardaten für Test
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    {
-      id: 'laptop',
-      name: 'Laptop',
-      type: 'tool',
-      quantity: 1,
-      description: 'Ein alter aber funktionsfähiger Laptop',
-      rarity: 'common',
-      icon: 'Laptop'
-    },
-    {
-      id: 'usb_stick',
-      name: 'USB-Stick',
-      type: 'tool',
-      quantity: 2,
-      description: 'Ein USB-Stick mit unbekanntem Inhalt',
-      rarity: 'uncommon',
-      icon: 'Usb'
-    },
-    {
-      id: 'keycard',
-      name: 'Zugangskarte',
-      type: 'key',
-      quantity: 1,
-      description: 'Eine magnetische Zugangskarte',
-      rarity: 'rare',
-      icon: 'Key'
-    },
-    {
-      id: 'hacking_manual',
-      name: 'Hacking-Handbuch',
-      type: 'document',
-      quantity: 1,
-      description: 'Ein detailliertes Handbuch für ethisches Hacking',
-      rarity: 'uncommon',
-      icon: 'BookOpen'
-    },
-    {
-      id: 'energy_drink',
-      name: 'Energy Drink',
-      type: 'consumable',
-      quantity: 3,
-      description: 'Gibt dir Energie für längere Hacking-Sessions',
-      rarity: 'common',
-      icon: 'Battery'
+  // Inventar-State
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+
+  // Inventar beim Laden abrufen
+  useEffect(() => {
+    loadInventory();
+  }, []);
+
+  const loadInventory = async () => {
+    try {
+      setIsLoadingInventory(true);
+      const result = await getInventory();
+      if (result.success && result.inventory) {
+        setInventory(result.inventory);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden des Inventars:', error);
+      // Fallback zu Mock-Daten bei Fehler
+      setInventory([
+        {
+          id: 'laptop',
+          name: 'Laptop',
+          type: 'tool',
+          quantity: 1,
+          description: 'Ein alter aber funktionsfähiger Laptop',
+          rarity: 'common',
+          icon: 'Laptop'
+        },
+        {
+          id: 'usb_stick',
+          name: 'USB-Stick',
+          type: 'tool',
+          quantity: 2,
+          description: 'Ein USB-Stick mit unbekanntem Inhalt',
+          rarity: 'uncommon',
+          icon: 'Usb'
+        },
+        {
+          id: 'keycard',
+          name: 'Zugangskarte',
+          type: 'key',
+          quantity: 1,
+          description: 'Eine magnetische Zugangskarte',
+          rarity: 'rare',
+          icon: 'Key'
+        },
+        {
+          id: 'hacking_manual',
+          name: 'Hacking-Handbuch',
+          type: 'document',
+          quantity: 1,
+          description: 'Ein detailliertes Handbuch für ethisches Hacking',
+          rarity: 'uncommon',
+          icon: 'BookOpen'
+        },
+        {
+          id: 'energy_drink',
+          name: 'Energy Drink',
+          type: 'consumable',
+          quantity: 3,
+          description: 'Gibt dir Energie für längere Hacking-Sessions',
+          rarity: 'common',
+          icon: 'Battery'
+        }
+      ]);
+    } finally {
+      setIsLoadingInventory(false);
     }
-  ]);
+  };
+
+  // Inventar-Update-Handler
+  const handleInventoryUpdate = (newInventory: InventoryItem[]) => {
+    setInventory(newInventory);
+  };
 
   const handleItemUse = (item: InventoryItem, target: any) => {
     console.log(`Item ${item.name} wird auf ${target.name} verwendet`);
@@ -179,6 +197,7 @@ export default function GameLayout() {
             roomId="intro" 
             inventory={inventory}
             onItemUse={handleItemUse}
+            onInventoryUpdate={handleInventoryUpdate}
           />
         )}
         {currentView === "terminal" && <Terminal />}
