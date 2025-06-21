@@ -77,23 +77,23 @@ const getItemIcon = (iconName?: string, itemType?: string) => {
 
 const getRarityColor = (rarity?: string) => {
   switch (rarity) {
-    case 'common': return 'text-gray-300';
-    case 'uncommon': return 'text-green-400';
-    case 'rare': return 'text-blue-400';
-    case 'epic': return 'text-purple-400';
+    case 'common': return 'text-green-400';
+    case 'uncommon': return 'text-green-300';
+    case 'rare': return 'text-green-200';
+    case 'epic': return 'text-green-100';
     case 'legendary': return 'text-yellow-400';
-    default: return 'text-gray-300';
+    default: return 'text-green-400';
   }
 };
 
 const getRarityBorderColor = (rarity?: string) => {
   switch (rarity) {
-    case 'common': return 'border-gray-500';
-    case 'uncommon': return 'border-green-500';
-    case 'rare': return 'border-blue-500';
-    case 'epic': return 'border-purple-500';
+    case 'common': return 'border-green-500';
+    case 'uncommon': return 'border-green-400';
+    case 'rare': return 'border-green-300';
+    case 'epic': return 'border-green-200';
     case 'legendary': return 'border-yellow-500';
-    default: return 'border-gray-500';
+    default: return 'border-green-500';
   }
 };
 
@@ -125,36 +125,39 @@ export default function InventoryBar({ items, onItemDragStart, onItemDragEnd }: 
 
   return (
     <TooltipProvider>
-      <div className="fixed left-4 top-1/2 transform -translate-y-1/2 z-40">
-        <Card className="bg-gray-800/95 backdrop-blur-sm border-gray-600 shadow-xl">
-          <CardContent className="p-3">
-            <div className="flex flex-col gap-2 max-h-96">
+      <div className="fixed left-4 bottom-4 z-40">
+        <div className="bg-black/70 backdrop-blur-sm border border-green-500 rounded-lg shadow-xl">
+          <div className="p-3">
+            <div className="flex flex-col gap-2">
               <div className="text-center mb-2">
-                <h3 className="text-sm font-semibold text-white">Inventar</h3>
-                <div className="text-xs text-gray-400">{items.length} Items</div>
+                <h3 className="text-green-400 font-bold text-xs">Inventar</h3>
+                <p className="text-green-300 text-xs">{items.length} Items</p>
               </div>
               
               <div 
-                className="flex flex-col gap-2 overflow-y-auto"
+                className="flex flex-row gap-2 overflow-x-auto pb-3 px-1"
                 style={{
                   scrollbarWidth: 'thin',
-                  scrollbarColor: 'rgb(75 85 99) transparent',
-                  maxHeight: '320px'
+                  scrollbarColor: 'rgb(34 197 94) transparent',
+                  maxWidth: '320px',
+                  paddingBottom: '12px'
                 }}
               >
                 <style jsx>{`
                   div::-webkit-scrollbar {
-                    width: 6px;
+                    height: 6px;
                   }
                   div::-webkit-scrollbar-track {
                     background: transparent;
                   }
                   div::-webkit-scrollbar-thumb {
-                    background: rgb(75 85 99);
+                    background: rgb(34 197 94);
                     border-radius: 3px;
+                    opacity: 0.5;
                   }
                   div::-webkit-scrollbar-thumb:hover {
-                    background: rgb(107 114 128);
+                    background: rgb(74 222 128);
+                    opacity: 0.8;
                   }
                 `}</style>
                 
@@ -164,11 +167,16 @@ export default function InventoryBar({ items, onItemDragStart, onItemDragEnd }: 
                       key={item.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
+                      exit={{ opacity: 0, x: 20 }}
                       transition={{ delay: index * 0.1, duration: 0.3 }}
-                      className={`relative group ${
+                      className={`relative group flex-shrink-0 ${
                         draggedItem?.id === item.id ? 'opacity-50' : ''
                       }`}
+                      style={{
+                        // Platz für Hover-Animation reservieren
+                        padding: '4px',
+                        margin: '0 -4px'
+                      }}
                     >
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -180,45 +188,43 @@ export default function InventoryBar({ items, onItemDragStart, onItemDragEnd }: 
                               w-12 h-12 rounded-lg border-2 cursor-grab active:cursor-grabbing
                               transition-all duration-200 hover:scale-110 hover:shadow-lg
                               flex items-center justify-center relative
-                              ${getRarityBorderColor(item.rarity)}
-                              ${getRarityColor(item.rarity)}
-                              bg-gray-700/80 hover:bg-gray-600/80
-                              ${draggedItem?.id === item.id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''}
+                              bg-black border-green-500 text-green-500 hover:bg-green-900
+                              ${draggedItem?.id === item.id ? 'ring-2 ring-green-400 ring-opacity-50' : ''}
                             `}
                           >
                             {getItemIcon(item.icon, item.type)}
                             
-                            {/* Quantity Badge - besser positioniert */}
+                            {/* Quantity Badge - im grünen Design */}
                             {item.quantity > 1 && (
-                              <Badge className="absolute -top-1 -right-1 bg-cyan-600 text-white text-xs min-w-0 px-1 h-4 leading-none">
+                              <Badge className="absolute -top-1 -right-1 bg-green-600 text-white text-xs min-w-0 px-1 h-3 leading-none border border-green-400">
                                 {item.quantity}
                               </Badge>
                             )}
                             
-                            {/* Rarity Indicator - kleiner und besser positioniert */}
+                            {/* Rarity Indicator - im grünen Design */}
                             {item.rarity && item.rarity !== 'common' && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+                              <div className="absolute -bottom-0.5 -right-0.5 w-1 h-1 rounded-full bg-green-400 opacity-80" />
                             )}
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-xs">
+                        <TooltipContent side="top" className="max-w-xs bg-black border-green-500">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                              <div className={`p-1 rounded ${getRarityColor(item.rarity)}`}>
+                              <div className="p-1 rounded text-green-400">
                                 {getItemIcon(item.icon, item.type)}
                               </div>
                               <div>
-                                <h4 className="font-semibold text-white">{item.name}</h4>
-                                <p className="text-xs text-gray-400 capitalize">{item.type}</p>
+                                <h4 className="font-semibold text-green-400">{item.name}</h4>
+                                <p className="text-xs text-green-300 capitalize">{item.type}</p>
                               </div>
                             </div>
-                            <p className="text-sm text-gray-300">{item.description}</p>
+                            <p className="text-sm text-green-300">{item.description}</p>
                             {item.rarity && item.rarity !== 'common' && (
-                              <Badge variant="outline" className={`text-xs ${getRarityColor(item.rarity)} ${getRarityBorderColor(item.rarity)}`}>
+                              <Badge variant="outline" className="text-xs text-green-400 border-green-400 bg-black">
                                 {item.rarity}
                               </Badge>
                             )}
-                            <p className="text-xs text-gray-400">Ziehen um zu verwenden</p>
+                            <p className="text-xs text-green-400">Ziehen um zu verwenden</p>
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -230,16 +236,16 @@ export default function InventoryBar({ items, onItemDragStart, onItemDragEnd }: 
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-center py-4"
+                    className="text-center py-4 flex-shrink-0"
                   >
-                    <Package className="h-6 w-6 mx-auto text-gray-500 mb-2" />
-                    <p className="text-xs text-gray-400">Inventar leer</p>
+                    <Package className="h-6 w-6 mx-auto text-green-500 mb-2" />
+                    <p className="text-xs text-green-400">Inventar leer</p>
                   </motion.div>
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </TooltipProvider>
   );
