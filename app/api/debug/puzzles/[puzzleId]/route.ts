@@ -1,112 +1,105 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuerySingle, executeQuery } from '@/lib/database';
+import { executeQuery } from '@/lib/database';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ puzzleId: string }> }
+  { params }: { params: { puzzleId: string } }
 ) {
   try {
-    const { puzzleId } = await params;
-
-    // Rätsel abrufen
-    const puzzle = await executeQuerySingle<{
-      id: number;
-      puzzle_id: string;
-      room_id: string;
-      name: string;
-      description: string;
-      puzzle_type: string;
-      difficulty: number;
-      solution: string;
-      hints: string;
-      max_attempts: number;
-      time_limit_seconds: number | null;
-      reward_money: number;
-      reward_exp: number;
-      reward_items: string;
-      is_required: boolean;
-      is_hidden: boolean;
-    }>(
-      'SELECT * FROM puzzles WHERE puzzle_id = ?',
-      [puzzleId]
-    );
-
-    if (!puzzle) {
-      return NextResponse.json({
-        success: false,
-        error: 'Rätsel nicht gefunden'
-      }, { status: 404 });
-    }
+    const puzzleId = params.puzzleId;
 
     // Rätsel-Daten abrufen
-    const puzzleData = await executeQuery<{
-      id: number;
-      puzzle_id: string;
-      data_type: string;
-      data_key: string;
-      data_value: string;
-    }>(
-      'SELECT * FROM puzzle_data WHERE puzzle_id = ? ORDER BY data_key',
-      [puzzleId]
-    );
+    const puzzleQuery = `
+      SELECT 
+        p.id,
+        p.puzzle_id,
+        p.room_id,
+        p.name,
+        p.description,
+        p.puzzle_type,
+        p.difficulty,
+        p.solution,
+        p.hints,
+        p.max_attempts,
+        p.time_limit_seconds,
+        p.reward_exp,
+        p.is_required,
+        p.created_at,
+        p.updated_at
+      FROM puzzles p
+      WHERE p.puzzle_id = ?
+    `;
 
-    // Hinweise extrahieren
-    const hints: string[] = [];
-    puzzleData.forEach(row => {
-      if (row.data_key.startsWith('hint_')) {
-        try {
-          const value = JSON.parse(row.data_value);
-          if (value && typeof value === 'object' && value.text) {
-            hints.push(value.text);
-          } else if (typeof value === 'string') {
-            hints.push(value);
-          }
-        } catch {
-          // Fallback für nicht-JSON Werte
-          hints.push(row.data_value);
-        }
+    const puzzleResult = await executeQuery(puzzleQuery, [puzzleId]);
+    
+    if (!puzzleResult || puzzleResult.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Rätsel nicht gefunden' },
+        { status: 404 }
+      );
+    }
+
+    const puzzle = puzzleResult[0];
+
+    // Hinweise aus puzzle_data abrufen
+    const hintsQuery = `
+      SELECT data_value
+      FROM puzzle_data
+      WHERE puzzle_id = ? AND data_type = 'terminal' AND data_key LIKE 'hint_%'
+      ORDER BY data_key
+    `;
+
+    const hintsResult = await executeQuery(hintsQuery, [puzzleId]);
+    const hints = hintsResult.map((row: any) => {
+      try {
+        const parsed = JSON.parse(row.data_value);
+        return parsed.text || parsed;
+      } catch {
+        return row.data_value;
       }
     });
 
-    // Fortschritt (für Debug-Zwecke immer leer)
+    // Lösung aus dem solution-Feld der puzzles-Tabelle
+    let solution: any = null;
+    try {
+      solution = JSON.parse(puzzle.solution);
+    } catch {
+      solution = puzzle.solution;
+    }
+
+    // Fortschritt (Mock - da keine Authentifizierung)
     const progress = {
-      isCompleted: false,
       attempts: 0,
-      bestTimeSeconds: null,
-      completedAt: null,
-      hintsUsed: 0,
-      completedQuestions: []
+      isCompleted: false,
+      completedAt: null
     };
 
-    const formattedPuzzle = {
-      puzzleId: puzzle.puzzle_id,
-      roomId: puzzle.room_id,
+    // Rätsel-Daten zusammenstellen
+    const puzzleData = {
+      id: puzzle.puzzle_id,
       name: puzzle.name,
       description: puzzle.description,
       type: puzzle.puzzle_type,
       difficulty: puzzle.difficulty,
-      solution: Array.isArray(puzzle.solution) ? puzzle.solution : JSON.parse(puzzle.solution || '[]'),
-      hints: hints,
       maxAttempts: puzzle.max_attempts,
       timeLimitSeconds: puzzle.time_limit_seconds,
       rewardExp: puzzle.reward_exp,
-      rewardItems: Array.isArray(puzzle.reward_items) ? puzzle.reward_items : JSON.parse(puzzle.reward_items || '[]'),
       isRequired: puzzle.is_required,
-      isHidden: puzzle.is_hidden,
-      progress: progress
+      hints,
+      solution,
+      progress
     };
 
     return NextResponse.json({
       success: true,
-      puzzle: formattedPuzzle
+      puzzle: puzzleData
     });
 
   } catch (error) {
     console.error('Fehler beim Abrufen des Rätsels:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Interner Server-Fehler',
-      details: error instanceof Error ? error.message : 'Unbekannter Fehler'
-    }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Interner Server-Fehler' },
+      { status: 500 }
+    );
   }
 } 
