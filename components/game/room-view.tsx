@@ -11,7 +11,7 @@ import ChoicePopup from './choice-popup';
 import MessagePopup from './message-popup';
 import InventoryBar from './inventory-bar';
 import DragDropFeedback from './drag-drop-feedback';
-import { pickItem, getRoomItems, type InventoryItem } from '@/lib/services/inventory-service';
+import { pickItem, getRoomItems, useItem, type InventoryItem } from '@/lib/services/inventory-service';
 
 interface InteractiveObject {
   id: string;
@@ -72,6 +72,7 @@ export default function RoomView({
   // Room Items State
   const [roomItems, setRoomItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUsingItem, setIsUsingItem] = useState(false);
 
   // Feedback Timer Ref
   const feedbackTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -255,6 +256,18 @@ export default function RoomView({
     setDraggedItem(item);
     event.dataTransfer.setData('application/json', JSON.stringify(item));
     event.dataTransfer.effectAllowed = 'copy';
+    
+    // Visuelles Feedback für das gezogene Item
+    if (event.dataTransfer.setDragImage) {
+      const dragImage = document.createElement('div');
+      dragImage.className = 'bg-black/80 border border-green-500 rounded-lg p-2 text-green-400 text-sm';
+      dragImage.textContent = item.name;
+      dragImage.style.position = 'absolute';
+      dragImage.style.top = '-1000px';
+      document.body.appendChild(dragImage);
+      event.dataTransfer.setDragImage(dragImage, 0, 0);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
+    }
   };
 
   const handleDragEnd = (event: React.DragEvent) => {
@@ -264,16 +277,37 @@ export default function RoomView({
 
   const handleDragOver = (event: React.DragEvent, object: InteractiveObject) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-    setDragOverObject(object.id);
+    
+    // Prüfen ob das gezogene Item mit diesem Objekt kompatibel ist
+    const draggedItemData = event.dataTransfer.getData('application/json');
+    if (draggedItemData) {
+      try {
+        const draggedItem: InventoryItem = JSON.parse(draggedItemData);
+        const isCompatible = object.compatibleItems?.includes(draggedItem.id) || false;
+        const isRequired = object.requiredItems?.includes(draggedItem.id) || false;
+        
+        if (isCompatible || isRequired) {
+          event.dataTransfer.dropEffect = 'copy';
+          setDragOverObject(object.id);
+        } else {
+          event.dataTransfer.dropEffect = 'none';
+          setDragOverObject(null);
+        }
+      } catch (error) {
+        event.dataTransfer.dropEffect = 'none';
+        setDragOverObject(null);
+      }
+    }
   };
 
   const handleDragLeave = (event: React.DragEvent) => {
     setDragOverObject(null);
   };
 
-  const handleDrop = (event: React.DragEvent, object: InteractiveObject) => {
+  const handleDrop = async (event: React.DragEvent, object: InteractiveObject) => {
     event.preventDefault();
+    
+    if (isUsingItem) return;
     
     try {
       const itemData = event.dataTransfer.getData('application/json');
@@ -291,18 +325,57 @@ export default function RoomView({
       };
       
       if (isCompatible || isRequired) {
-        // Erfolgreiche Interaktion
-        showFeedbackWithTimer({
-          isValid: true,
-          message: isRequired ? 'Item benötigt!' : 'Item kompatibel!',
-          position
+        setIsUsingItem(true);
+        
+        // API-Aufruf für Item-Verwendung
+        const result = await useItem({
+          itemId: droppedItem.id,
+          targetObjectId: object.id,
+          roomId: roomId
         });
-        
-        // Item verwenden
-        onItemUse?.(droppedItem, object);
-        
-        // Eventuelle Aktionen basierend auf Item und Objekt
-        handleItemUse(droppedItem, object);
+
+        if (result.success) {
+          // Erfolgreiche Interaktion
+          showFeedbackWithTimer({
+            isValid: true,
+            message: result.message || 'Item erfolgreich verwendet!',
+            position
+          });
+          
+          // Inventar aktualisieren (falls Item verbraucht wurde)
+          if (result.inventory && onInventoryUpdate) {
+            onInventoryUpdate(result.inventory);
+          }
+          
+          // Eventuelle Raum-Änderungen verarbeiten
+          if (result.roomChanges) {
+            console.log('Raum-Änderungen:', result.roomChanges);
+            // Hier könnte die Raum-Ansicht aktualisiert werden
+          }
+          
+          // Eventuelle neue Features freischalten
+          if (result.unlockedFeatures) {
+            console.log('Neue Features freigeschaltet:', result.unlockedFeatures);
+            // Hier könnte das UI neue Funktionen anzeigen
+          }
+          
+          // Eventuelle neue Rätsel anzeigen
+          if (result.newPuzzles) {
+            console.log('Neue Rätsel verfügbar:', result.newPuzzles);
+            // Hier könnten neue Rätsel angezeigt werden
+          }
+          
+          // Item verwenden (Callback)
+          onItemUse?.(droppedItem, object);
+          
+        } else {
+          // Fehler bei der Interaktion
+          showFeedbackWithTimer({
+            isValid: false,
+            message: result.error || 'Fehler beim Verwenden des Items',
+            position
+          });
+        }
       } else {
         // Nicht kompatible Interaktion
         showFeedbackWithTimer({
@@ -314,10 +387,16 @@ export default function RoomView({
       
     } catch (error) {
       console.error('Fehler beim Verarbeiten des gedropten Items:', error);
+      showFeedbackWithTimer({
+        isValid: false,
+        message: 'Netzwerkfehler beim Verwenden des Items',
+        position: { x: 50, y: 50 }
+      });
+    } finally {
+      setIsUsingItem(false);
+      setDraggedItem(null);
+      setDragOverObject(null);
     }
-    
-    setDraggedItem(null);
-    setDragOverObject(null);
   };
 
   const handleItemUse = (item: InventoryItem, object: InteractiveObject) => {
@@ -459,7 +538,7 @@ export default function RoomView({
               'text-cyan-400'
             }`}>
               <div className={`bg-black/50 backdrop-blur-sm rounded-lg p-2 border border-current/30 hover:bg-black/70 transition-colors ${
-                dragOverObject === object.id ? 'bg-cyan-500/20 border-cyan-400' : ''
+                dragOverObject === object.id ? 'bg-cyan-500/20 border-cyan-400 scale-110' : ''
               }`}>
                 {object.icon === 'Zap' && <Zap className="h-6 w-6" />}
                 {object.icon === 'Eye' && <Eye className="h-6 w-6" />}
@@ -485,6 +564,15 @@ export default function RoomView({
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   className="absolute inset-0 bg-cyan-400/20 rounded-lg border-2 border-cyan-400"
+                />
+              )}
+              
+              {/* Drop-Zone Indicator */}
+              {draggedItem && (object.compatibleItems?.includes(draggedItem.id) || object.requiredItems?.includes(draggedItem.id)) && (
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="absolute inset-0 bg-green-400/10 rounded-lg border border-green-400/50"
                 />
               )}
             </div>
@@ -572,12 +660,14 @@ export default function RoomView({
       />
 
       {/* Loading Overlay */}
-      {isLoading && (
+      {(isLoading || isUsingItem) && (
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-black/80 border border-green-500 rounded-lg p-4">
             <div className="text-green-400 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
-              <p className="text-sm">Item wird aufgesammelt...</p>
+              <p className="text-sm">
+                {isLoading ? 'Item wird aufgesammelt...' : 'Item wird verwendet...'}
+              </p>
             </div>
           </div>
         </div>
@@ -649,6 +739,13 @@ export default function RoomView({
                     {tooltipData.compatibleItems && tooltipData.compatibleItems.length > 0 && (
                       <div className="mt-2 text-xs text-gray-400">
                         <p>Kompatible Items: {tooltipData.compatibleItems.join(', ')}</p>
+                      </div>
+                    )}
+                    
+                    {/* Drag-and-Drop Hinweis für gezogene Items */}
+                    {draggedItem && (tooltipData.compatibleItems?.includes(draggedItem.id) || tooltipData.requiredItems?.includes(draggedItem.id)) && (
+                      <div className="mt-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-xs text-green-400">
+                        <p>✓ {draggedItem.name} kann hier verwendet werden</p>
                       </div>
                     )}
                   </div>

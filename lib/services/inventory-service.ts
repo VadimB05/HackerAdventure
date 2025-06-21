@@ -29,6 +29,23 @@ export interface PickItemResponse {
   count?: number;
 }
 
+export interface UseItemRequest {
+  itemId: string;
+  targetObjectId: string;
+  roomId: string;
+}
+
+export interface UseItemResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  inventory?: InventoryItem[];
+  unlockedFeatures?: string[];
+  newPuzzles?: any[];
+  roomChanges?: any;
+  itemConsumed?: boolean;
+}
+
 /**
  * Item aus einem Raum aufsammeln
  */
@@ -64,6 +81,47 @@ export async function pickItem(request: PickItemRequest): Promise<PickItemRespon
     return {
       success: false,
       error: 'Netzwerkfehler beim Aufsammeln des Items'
+    };
+  }
+}
+
+/**
+ * Item auf ein Objekt im Raum verwenden (Drag&Drop)
+ */
+export async function useItem(request: UseItemRequest): Promise<UseItemResponse> {
+  try {
+    const response = await fetch('/api/game/use-item', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Fehler beim Verwenden des Items'
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message,
+      inventory: data.inventory,
+      unlockedFeatures: data.unlockedFeatures,
+      newPuzzles: data.newPuzzles,
+      roomChanges: data.roomChanges,
+      itemConsumed: data.itemConsumed
+    };
+  } catch (error) {
+    console.error('Fehler beim Verwenden des Items:', error);
+    return {
+      success: false,
+      error: 'Netzwerkfehler beim Verwenden des Items'
     };
   }
 }
