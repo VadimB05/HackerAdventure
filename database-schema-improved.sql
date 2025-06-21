@@ -32,7 +32,7 @@ CREATE TABLE missions (
     description TEXT,
     difficulty INT DEFAULT 1, -- 1-5
     required_level INT DEFAULT 1,
-    reward_money DECIMAL(10,2) DEFAULT 0.00,
+    reward_bitcoins DECIMAL(10,8) DEFAULT 0.00000000,
     reward_exp INT DEFAULT 0,
     is_available BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -78,7 +78,7 @@ CREATE TABLE puzzles (
     hints JSON DEFAULT '[]',
     max_attempts INT DEFAULT 3, -- Maximale Versuche
     time_limit_seconds INT NULL, -- Optional: Zeitlimit
-    reward_money DECIMAL(10,2) DEFAULT 0.00,
+    reward_bitcoins DECIMAL(10,8) DEFAULT 0.00000000,
     reward_exp INT DEFAULT 0,
     reward_items JSON DEFAULT '[]',
     is_required BOOLEAN DEFAULT FALSE,
@@ -116,7 +116,7 @@ CREATE TABLE game_states (
     current_mission VARCHAR(100) NULL,
     inventory JSON DEFAULT '[]',
     progress JSON DEFAULT '{}', -- Fortschritt pro Raum/Mission
-    money DECIMAL(10,2) DEFAULT 0.00,
+    bitcoins DECIMAL(10,8) DEFAULT 0.00000000,
     experience_points INT DEFAULT 0,
     level INT DEFAULT 1,
     health INT DEFAULT 100, -- Optional: Gesundheitssystem
@@ -159,7 +159,7 @@ CREATE TABLE items (
     description TEXT,
     item_type ENUM('tool', 'key', 'document', 'consumable', 'equipment', 'weapon', 'armor') NOT NULL,
     rarity ENUM('common', 'uncommon', 'rare', 'epic', 'legendary') DEFAULT 'common',
-    value DECIMAL(10,2) DEFAULT 0.00,
+    value DECIMAL(10,8) DEFAULT 0.00000000,
     is_tradeable BOOLEAN DEFAULT TRUE,
     is_stackable BOOLEAN DEFAULT FALSE, -- Stapelbare Items
     max_stack_size INT DEFAULT 1, -- Maximale Stapelgröße
@@ -195,7 +195,7 @@ CREATE TABLE player_stats (
     puzzles_solved INT DEFAULT 0,
     rooms_visited INT DEFAULT 0,
     missions_completed INT DEFAULT 0,
-    total_money_earned DECIMAL(10,2) DEFAULT 0.00,
+    total_bitcoins_earned DECIMAL(10,8) DEFAULT 0.00000000,
     total_exp_earned INT DEFAULT 0,
     play_time_minutes INT DEFAULT 0,
     total_attempts INT DEFAULT 0, -- Gesamte Versuche
@@ -219,9 +219,9 @@ CREATE TABLE achievements (
     required_puzzles_solved INT DEFAULT 0,
     required_rooms_visited INT DEFAULT 0,
     required_missions_completed INT DEFAULT 0,
-    required_money_earned DECIMAL(10,2) DEFAULT 0.00,
+    required_bitcoins_earned DECIMAL(10,8) DEFAULT 0.00000000,
     required_exp_earned INT DEFAULT 0,
-    reward_money DECIMAL(10,2) DEFAULT 0.00,
+    reward_bitcoins DECIMAL(10,8) DEFAULT 0.00000000,
     reward_exp INT DEFAULT 0,
     reward_items JSON DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -253,7 +253,7 @@ CREATE TABLE player_sessions (
     puzzles_attempted INT DEFAULT 0,
     puzzles_completed INT DEFAULT 0,
     rooms_visited INT DEFAULT 0,
-    money_earned DECIMAL(10,2) DEFAULT 0.00,
+    bitcoins_earned DECIMAL(10,8) DEFAULT 0.00000000,
     exp_earned INT DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
@@ -276,11 +276,11 @@ CREATE TABLE room_items (
 -- Standard-Daten einfügen
 
 -- Standard-Missionen
-INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_money, reward_exp) VALUES
-('tutorial', 'Tutorial Mission', 'Lerne die Grundlagen des ethischen Hackings', 1, 1, 100.00, 50),
-('basement_investigation', 'Keller-Untersuchung', 'Untersuche die mysteriösen Computer im Keller', 2, 2, 250.00, 100),
-('city_network', 'Stadtnetzwerk', 'Hacke dich ins städtische Netzwerk', 3, 3, 500.00, 200),
-('darknet_operation', 'Darknet-Operation', 'Tauche ein in die Tiefen des Darknets', 4, 4, 1000.00, 400);
+INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp) VALUES
+('tutorial', 'Tutorial Mission', 'Lerne die Grundlagen des ethischen Hackings', 1, 1, 0.00100000, 50),
+('basement_investigation', 'Keller-Untersuchung', 'Untersuche die mysteriösen Computer im Keller', 2, 2, 0.00250000, 100),
+('city_network', 'Stadtnetzwerk', 'Hacke dich ins städtische Netzwerk', 3, 3, 0.00500000, 200),
+('darknet_operation', 'Darknet-Operation', 'Tauche ein in die Tiefen des Darknets', 4, 4, 0.01000000, 400);
 
 -- Standard-Räume
 INSERT INTO rooms (room_id, mission_id, name, description, is_locked, required_level) VALUES
@@ -292,11 +292,11 @@ INSERT INTO rooms (room_id, mission_id, name, description, is_locked, required_l
 
 -- Standard-Items
 INSERT INTO items (item_id, name, description, item_type, rarity, value, is_stackable, max_stack_size) VALUES
-('laptop', 'Laptop', 'Ein alter aber funktionsfähiger Laptop', 'tool', 'common', 100.00, FALSE, 1),
-('usb_stick', 'USB-Stick', 'Ein USB-Stick mit unbekanntem Inhalt', 'tool', 'uncommon', 50.00, TRUE, 10),
-('keycard', 'Zugangskarte', 'Eine magnetische Zugangskarte', 'key', 'rare', 200.00, FALSE, 1),
-('hacking_manual', 'Hacking-Handbuch', 'Ein detailliertes Handbuch für ethisches Hacking', 'document', 'uncommon', 75.00, FALSE, 1),
-('energy_drink', 'Energy Drink', 'Gibt dir Energie für längere Hacking-Sessions', 'consumable', 'common', 5.00, TRUE, 20);
+('laptop', 'Laptop', 'Ein alter aber funktionsfähiger Laptop', 'tool', 'common', 0.00100000, FALSE, 1),
+('usb_stick', 'USB-Stick', 'Ein USB-Stick mit unbekanntem Inhalt', 'tool', 'uncommon', 0.00050000, TRUE, 10),
+('keycard', 'Zugangskarte', 'Eine magnetische Zugangskarte', 'key', 'rare', 0.00200000, FALSE, 1),
+('hacking_manual', 'Hacking-Handbuch', 'Ein detailliertes Handbuch für ethisches Hacking', 'document', 'uncommon', 0.00075000, FALSE, 1),
+('energy_drink', 'Energy Drink', 'Gibt dir Energie für längere Hacking-Sessions', 'consumable', 'common', 0.00005000, TRUE, 20);
 
 -- Standard-Achievements
 INSERT INTO achievements (achievement_id, name, description, category, required_puzzles_solved, reward_exp) VALUES
@@ -318,8 +318,8 @@ BEGIN
             total_exp_earned = total_exp_earned + (
                 SELECT reward_exp FROM puzzles WHERE puzzle_id = NEW.puzzle_id
             ),
-            total_money_earned = total_money_earned + (
-                SELECT reward_money FROM puzzles WHERE puzzle_id = NEW.puzzle_id
+            total_bitcoins_earned = total_bitcoins_earned + (
+                SELECT reward_bitcoins FROM puzzles WHERE puzzle_id = NEW.puzzle_id
             ),
             hints_used_total = hints_used_total + NEW.hints_used
         WHERE user_id = NEW.user_id;
@@ -338,13 +338,13 @@ SELECT
     u.created_at,
     gs.current_room,
     gs.current_mission,
-    gs.money,
+    gs.bitcoins,
     gs.experience_points,
     gs.level,
     ps.puzzles_solved,
     ps.rooms_visited,
     ps.missions_completed,
-    ps.total_money_earned,
+    ps.total_bitcoins_earned,
     ps.total_exp_earned
 FROM users u
 LEFT JOIN game_states gs ON u.id = gs.user_id
@@ -360,7 +360,7 @@ SELECT
     p.difficulty,
     r.name as room_name,
     m.name as mission_name,
-    p.reward_money,
+    p.reward_bitcoins,
     p.reward_exp,
     p.is_required,
     p.is_hidden
@@ -376,12 +376,12 @@ SELECT
     m.name,
     m.difficulty,
     m.required_level,
-    m.reward_money,
+    m.reward_bitcoins,
     m.reward_exp,
     COUNT(r.id) as room_count,
     COUNT(p.id) as puzzle_count
 FROM missions m
 LEFT JOIN rooms r ON m.mission_id = r.mission_id
 LEFT JOIN puzzles p ON r.room_id = p.room_id
-GROUP BY m.mission_id, m.name, m.difficulty, m.required_level, m.reward_money, m.reward_exp
+GROUP BY m.mission_id, m.name, m.difficulty, m.required_level, m.reward_bitcoins, m.reward_exp
 ORDER BY m.required_level, m.difficulty; 
