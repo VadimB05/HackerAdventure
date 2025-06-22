@@ -4,14 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Eye, Puzzle, Lock, Trophy, Package, MapPin, Coins, DoorOpen, Monitor, MessageSquare, MapPin as MapPinIcon, Server } from 'lucide-react';
-import { useGameState } from './game-context';
+import { Button } from '@/components/ui/button';
+import { Zap, Eye, Puzzle, Lock, Trophy, Package, MapPin, Coins, DoorOpen, Monitor, MessageSquare, MapPin as MapPinIcon, Server, ArrowRight, CheckCircle } from 'lucide-react';
 import SmartphoneOverlay from './smartphone-overlay';
 import ChoicePopup from './choice-popup';
 import MessagePopup from './message-popup';
 import InventoryBar from './inventory-bar';
 import DragDropFeedback from './drag-drop-feedback';
 import { pickItem, getRoomItems, useItem, type InventoryItem } from '@/lib/services/inventory-service';
+import { changeRoom, getGameProgress } from '@/lib/services/progress-service';
 
 interface InteractiveObject {
   id: string;
@@ -39,6 +40,8 @@ interface RoomViewProps {
   inventory?: InventoryItem[];
   onItemUse?: (item: InventoryItem, target: InteractiveObject) => void;
   onInventoryUpdate?: (inventory: InventoryItem[]) => void;
+  onRoomChange?: (newRoomId: string) => void;
+  onUnlockNotification?: (message: string) => void;
 }
 
 export default function RoomView({ 
@@ -47,9 +50,10 @@ export default function RoomView({
   onExitClick, 
   inventory = [],
   onItemUse,
-  onInventoryUpdate
+  onInventoryUpdate,
+  onRoomChange,
+  onUnlockNotification
 }: RoomViewProps) {
-  const { setCurrentView } = useGameState();
   const [hoveredObject, setHoveredObject] = useState<string | null>(null);
   const [tooltipData, setTooltipData] = useState<InteractiveObject | null>(null);
   const [isSmartphoneOpen, setIsSmartphoneOpen] = useState(false);
@@ -74,6 +78,20 @@ export default function RoomView({
   const [isLoading, setIsLoading] = useState(false);
   const [isUsingItem, setIsUsingItem] = useState(false);
 
+  // Room Change States
+  const [availableExits, setAvailableExits] = useState<Array<{
+    id: string;
+    name: string;
+    description: string;
+    roomId: string;
+    isUnlocked: boolean;
+    unlockMessage?: string;
+  }>>([]);
+  const [isChangingRoom, setIsChangingRoom] = useState(false);
+  const [showUnlockNotification, setShowUnlockNotification] = useState(false);
+  const [unlockMessage, setUnlockMessage] = useState('');
+  const [gameProgress, setGameProgress] = useState<any>(null);
+
   // Feedback Timer Ref
   const feedbackTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -89,6 +107,8 @@ export default function RoomView({
   // Raum-Items beim Laden abrufen
   useEffect(() => {
     loadRoomItems();
+    loadGameProgress();
+    loadAvailableExits();
   }, [roomId]);
 
   const loadRoomItems = async () => {
@@ -99,6 +119,46 @@ export default function RoomView({
       }
     } catch (error) {
       console.error('Fehler beim Laden der Raum-Items:', error);
+    }
+  };
+
+  const loadGameProgress = async () => {
+    try {
+      // TODO: Echte User-ID verwenden
+      const userId = 1;
+      const result = await getGameProgress(userId);
+      if (result.success && result.progress) {
+        setGameProgress(result.progress);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden des Spieler-Fortschritts:', error);
+    }
+  };
+
+  const loadAvailableExits = async () => {
+    try {
+      // Mock-Exits für jetzt - später aus API laden
+      const mockExits = [
+        {
+          id: 'door_to_living_room',
+          name: 'Tür zum Wohnzimmer',
+          description: 'Führe zum Wohnzimmer',
+          roomId: 'living_room',
+          isUnlocked: true,
+          unlockMessage: 'Wohnzimmer freigeschaltet!'
+        },
+        {
+          id: 'door_to_kitchen',
+          name: 'Tür zur Küche',
+          description: 'Führe zur Küche',
+          roomId: 'kitchen',
+          isUnlocked: false,
+          unlockMessage: 'Küche freigeschaltet!'
+        }
+      ];
+      setAvailableExits(mockExits);
+    } catch (error) {
+      console.error('Fehler beim Laden der verfügbaren Exits:', error);
     }
   };
 
@@ -435,6 +495,28 @@ export default function RoomView({
       return;
     }
     
+    // Exit-Behandlung
+    if (object.type === 'exit') {
+      const exit = availableExits.find(e => e.id === object.id);
+      if (exit) {
+        if (exit.isUnlocked) {
+          // Raumwechsel durchführen
+          handleRoomChange(exit.id, exit.roomId);
+        } else {
+          // Exit ist noch gesperrt
+          showFeedbackWithTimer({
+            isValid: false,
+            message: 'Dieser Ausgang ist noch gesperrt',
+            position: { x: 50, y: 50 }
+          });
+        }
+      } else {
+        // Standard Exit-Behandlung
+        onExitClick?.(object.id);
+      }
+      return;
+    }
+    
     // Verbinde mit den vorhandenen Komponenten
     switch (object.id) {
       case 'computer':
@@ -454,11 +536,7 @@ export default function RoomView({
         setIsDoorPopupOpen(true);
         break;
       default:
-        if (object.type === 'exit') {
-          onExitClick?.(object.id);
-        } else {
-          onObjectClick?.(object);
-        }
+        onObjectClick?.(object);
     }
   };
 
@@ -470,6 +548,58 @@ export default function RoomView({
   const handleObjectLeave = () => {
     setHoveredObject(null);
     setTooltipData(null);
+  };
+
+  // Raumwechsel-Funktion
+  const handleRoomChange = async (exitId: string, targetRoomId: string) => {
+    if (isChangingRoom) return;
+    
+    setIsChangingRoom(true);
+    
+    try {
+      // TODO: Echte User-ID verwenden
+      const userId = 1;
+      const result = await changeRoom(userId, targetRoomId);
+      
+      if (result.success) {
+        // Erfolgreicher Raumwechsel
+        onRoomChange?.(targetRoomId);
+        
+        // Animation und Übergang
+        setTimeout(() => {
+          setIsChangingRoom(false);
+        }, 1000);
+      } else {
+        console.error('Fehler beim Raumwechsel:', result.error);
+        setIsChangingRoom(false);
+      }
+    } catch (error) {
+      console.error('Netzwerkfehler beim Raumwechsel:', error);
+      setIsChangingRoom(false);
+    }
+  };
+
+  // Freischaltungs-Benachrichtigung anzeigen
+  const displayUnlockNotification = (message: string) => {
+    setUnlockMessage(message);
+    setShowUnlockNotification(true);
+    
+    // Automatisch ausblenden nach 3 Sekunden
+    setTimeout(() => {
+      setShowUnlockNotification(false);
+    }, 3000);
+    
+    // Callback aufrufen
+    onUnlockNotification?.(message);
+  };
+
+  // Prüfen ob ein Exit freigeschaltet wurde
+  const checkForUnlocks = () => {
+    availableExits.forEach(exit => {
+      if (exit.isUnlocked && exit.unlockMessage) {
+        displayUnlockNotification(exit.unlockMessage);
+      }
+    });
   };
 
   return (
@@ -777,7 +907,7 @@ export default function RoomView({
         ]}
         onSelect={(optionId) => {
           setIsComputerPopupOpen(false);
-          setCurrentView(optionId as any);
+          console.log('Computer-Option ausgewählt:', optionId);
         }}
         onCancel={() => setIsComputerPopupOpen(false)}
       />
@@ -803,7 +933,7 @@ export default function RoomView({
         ]}
         onSelect={(optionId) => {
           setIsDoorPopupOpen(false);
-          setCurrentView(optionId as any);
+          console.log('Tür-Option ausgewählt:', optionId);
         }}
         onCancel={() => setIsDoorPopupOpen(false)}
       />
@@ -821,6 +951,72 @@ export default function RoomView({
         isOpen={isSmartphoneOpen} 
         onClose={() => setIsSmartphoneOpen(false)} 
       />
+
+      {/* Freischaltungs-Benachrichtigung */}
+      <AnimatePresence>
+        {showUnlockNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -100, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -100, scale: 0.8 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50"
+          >
+            <Card className="bg-green-900/90 backdrop-blur-sm border-green-500 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-6 w-6 text-green-400" />
+                  <div>
+                    <h3 className="font-semibold text-green-400">Neuer Bereich freigeschaltet!</h3>
+                    <p className="text-sm text-green-300">{unlockMessage}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* "Weiter"-Button für freigeschaltete Exits */}
+      <AnimatePresence>
+        {availableExits.some(exit => exit.isUnlocked) && (
+          <motion.div
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="fixed right-4 top-4 z-40"
+          >
+            <Card className="bg-blue-900/90 backdrop-blur-sm border-blue-500">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <ArrowRight className="h-4 w-4 text-blue-400" />
+                  <span className="text-sm text-blue-400 font-medium">Weiter</span>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Raumwechsel-Animation */}
+      <AnimatePresence>
+        {isChangingRoom && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+          >
+            <div className="text-center text-white">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+              <h2 className="text-xl font-bold mb-2">Raumwechsel...</h2>
+              <p className="text-gray-300">Lade neuen Bereich</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 } 

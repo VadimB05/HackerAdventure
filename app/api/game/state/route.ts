@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
         current_room: string;
         inventory: string;
         progress: string;
-        money: number;
+        bitcoins: number;
         experience_points: number;
         level: number;
         current_mission: string | null;
       }>(
-        'SELECT current_room, inventory, progress, money, experience_points, level, current_mission FROM game_states WHERE user_id = ?',
+        'SELECT current_room, inventory, progress, bitcoins, experience_points, level, current_mission FROM game_states WHERE user_id = ?',
         [userId]
       );
 
@@ -44,11 +44,11 @@ export async function GET(request: NextRequest) {
         puzzles_solved: number;
         rooms_visited: number;
         missions_completed: number;
-        total_money_earned: number;
+        total_bitcoins_earned: number;
         total_exp_earned: number;
         play_time_minutes: number;
       }>(
-        'SELECT puzzles_solved, rooms_visited, missions_completed, total_money_earned, total_exp_earned, play_time_minutes FROM player_stats WHERE user_id = ?',
+        'SELECT puzzles_solved, rooms_visited, missions_completed, total_bitcoins_earned, total_exp_earned, play_time_minutes FROM player_stats WHERE user_id = ?',
         [userId]
       );
 
@@ -88,10 +88,10 @@ export async function GET(request: NextRequest) {
           description: string;
           difficulty: number;
           required_level: number;
-          reward_money: number;
+          reward_bitcoins: number;
           reward_exp: number;
         }>(
-          'SELECT mission_id, name, description, difficulty, required_level, reward_money, reward_exp FROM missions WHERE mission_id = ?',
+          'SELECT mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp FROM missions WHERE mission_id = ?',
           [gameState.current_mission]
         );
       }
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
         currentRoom: gameState.current_room,
         inventory: JSON.parse(gameState.inventory || '[]'),
         progress: JSON.parse(gameState.progress || '{}'),
-        money: gameState.money,
+        bitcoins: gameState.bitcoins,
         experiencePoints: gameState.experience_points,
         level: gameState.level,
         currentMission: gameState.current_mission
@@ -132,14 +132,14 @@ export async function GET(request: NextRequest) {
         puzzlesSolved: playerStats.puzzles_solved,
         roomsVisited: playerStats.rooms_visited,
         missionsCompleted: playerStats.missions_completed,
-        totalMoneyEarned: playerStats.total_money_earned,
+        totalBitcoinsEarned: playerStats.total_bitcoins_earned,
         totalExpEarned: playerStats.total_exp_earned,
         playTimeMinutes: playerStats.play_time_minutes
       } : {
         puzzlesSolved: 0,
         roomsVisited: 0,
         missionsCompleted: 0,
-        totalMoneyEarned: 0,
+        totalBitcoinsEarned: 0,
         totalExpEarned: 0,
         playTimeMinutes: 0
       };
@@ -175,15 +175,15 @@ export async function PUT(request: NextRequest) {
   return requireAuth(async (req) => {
     try {
       const userId = req.user!.id;
-      const { currentRoom, inventory, progress, money, experiencePoints, level, currentMission } = await request.json();
+      const { currentRoom, inventory, progress, bitcoins, experiencePoints, level, currentMission } = await request.json();
 
       await executeUpdate(
-        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
+        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, bitcoins = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
         [
           currentRoom,
           JSON.stringify(inventory || []),
           JSON.stringify(progress || {}),
-          money || 0,
+          bitcoins || 0,
           experiencePoints || 0,
           level || 1,
           currentMission || null,

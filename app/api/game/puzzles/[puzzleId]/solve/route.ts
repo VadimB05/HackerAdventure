@@ -23,18 +23,20 @@ export async function POST(
 
       // Rätsel abrufen
       const puzzle = await executeQuerySingle<{
-        id: number;
         puzzle_id: string;
-        room_id: string;
         name: string;
+        description: string;
         puzzle_type: string;
         difficulty: number;
         solution: string;
+        hints: string;
         max_attempts: number;
         time_limit_seconds: number | null;
-        reward_money: number;
+        reward_bitcoins: number;
         reward_exp: number;
         reward_items: string;
+        is_required: boolean;
+        is_hidden: boolean;
       }>(
         'SELECT * FROM puzzles WHERE puzzle_id = ?',
         [puzzleId]
@@ -209,10 +211,10 @@ export async function POST(
           );
 
           // Belohnungen vergeben
-          if (puzzle.reward_money > 0) {
+          if (puzzle.reward_bitcoins > 0) {
             await executeQuery(
-              'UPDATE game_states SET money = money + ? WHERE user_id = ?',
-              [puzzle.reward_money, userId]
+              'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
+              [puzzle.reward_bitcoins, userId]
             );
           }
 
@@ -225,8 +227,8 @@ export async function POST(
 
           // Statistik aktualisieren
           await executeQuery(
-            'UPDATE player_stats SET puzzles_solved = puzzles_solved + 1, total_money_earned = total_money_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
-            [puzzle.reward_money, puzzle.reward_exp, userId]
+            'UPDATE player_stats SET puzzles_solved = puzzles_solved + 1, total_bitcoins_earned = total_bitcoins_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
+            [puzzle.reward_bitcoins, puzzle.reward_exp, userId]
           );
         }
 
@@ -240,7 +242,7 @@ export async function POST(
           attempts: newAttempts,
           maxAttempts: puzzle.max_attempts,
           rewards: isCorrect ? {
-            money: puzzle.reward_money,
+            bitcoins: puzzle.reward_bitcoins,
             exp: puzzle.reward_exp,
             items: JSON.parse(puzzle.reward_items || '[]')
           } : null

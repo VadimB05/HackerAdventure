@@ -13,14 +13,14 @@ export async function POST(request: NextRequest) {
 
       // Spielstand auf Standardwerte zurücksetzen
       await executeUpdate(
-        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, money = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
-        ['intro', '[]', '{}', 0.00, 0, 1, 'mission_001', userId]
+        'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, bitcoins = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
+        ['intro', '[]', '{}', 0.00000000, 0, 1, 'mission_001', userId]
       );
 
       // Spieler-Statistiken zurücksetzen
       await executeUpdate(
-        'UPDATE player_stats SET puzzles_solved = ?, rooms_visited = ?, total_money_earned = ?, total_exp_earned = ? WHERE user_id = ?',
-        [0, 0, 0.00, 0, userId]
+        'UPDATE player_stats SET puzzles_solved = ?, rooms_visited = ?, total_bitcoins_earned = ?, total_exp_earned = ? WHERE user_id = ?',
+        [0, 0, 0.00000000, 0, userId]
       );
 
       return NextResponse.json({

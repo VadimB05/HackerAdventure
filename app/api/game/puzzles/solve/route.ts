@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         message: 'Rätsel erfolgreich gelöst!',
         puzzleId,
         reward: {
-          money: 50,
+          bitcoins: 0.00000050,
           experience: 25,
           items: ['usb_stick']
         }

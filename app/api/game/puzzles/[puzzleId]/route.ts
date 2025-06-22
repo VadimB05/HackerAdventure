@@ -31,7 +31,7 @@ export async function GET(
         hints: string;
         max_attempts: number;
         time_limit_seconds: number | null;
-        reward_money: number;
+        reward_bitcoins: number;
         reward_exp: number;
         reward_items: string;
         is_required: boolean;
@@ -96,7 +96,7 @@ export async function GET(
         hints: JSON.parse(puzzle.hints || '[]'),
         maxAttempts: puzzle.max_attempts,
         timeLimitSeconds: puzzle.time_limit_seconds,
-        rewardMoney: puzzle.reward_money,
+        rewardBitcoins: puzzle.reward_bitcoins,
         rewardExp: puzzle.reward_exp,
         rewardItems: JSON.parse(puzzle.reward_items || '[]'),
         isRequired: puzzle.is_required,
