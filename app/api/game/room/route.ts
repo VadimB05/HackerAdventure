@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
           i.is_stackable,
           i.max_stack_size,
           i.icon
-        FROM room_items ri
+         FROM room_items ri
         JOIN items i ON ri.item_id = i.id
         WHERE ri.room_id = ? AND ri.is_available = true
         ORDER BY ri.created_at DESC`,

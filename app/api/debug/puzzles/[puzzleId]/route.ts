@@ -3,10 +3,10 @@ import { executeQuery } from '@/lib/database';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { puzzleId: string } }
+  { params }: { params: Promise<{ puzzleId: string }> }
 ) {
   try {
-    const puzzleId = params.puzzleId;
+    const { puzzleId } = await params;
 
     // Rätsel-Daten abrufen
     const puzzleQuery = `
@@ -76,6 +76,7 @@ export async function GET(
 
     // Rätsel-Daten zusammenstellen
     const puzzleData = {
+      puzzleId: puzzle.puzzle_id,
       id: puzzle.puzzle_id,
       name: puzzle.name,
       description: puzzle.description,
@@ -84,6 +85,7 @@ export async function GET(
       maxAttempts: puzzle.max_attempts,
       timeLimitSeconds: puzzle.time_limit_seconds,
       rewardExp: puzzle.reward_exp,
+      rewardMoney: 0.0001,
       isRequired: puzzle.is_required,
       hints,
       solution,

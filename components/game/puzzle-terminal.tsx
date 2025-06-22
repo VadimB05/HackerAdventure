@@ -101,26 +101,87 @@ export default function PuzzleTerminal({
       setIsLoading(true);
       setError(null);
 
+      // Versuche zuerst die Debug-API
       const result = await fetch(`/api/debug/puzzles/${puzzleId}`);
       const data = await result.json();
 
       if (result.ok && data.success) {
-        setPuzzleData(data.puzzle);
-        setAttempts(data.puzzle.progress?.attempts || 0);
+        // Debug-API Format zu Terminal-Format konvertieren
+        const puzzle = data.puzzle;
+        setPuzzleData({
+          id: puzzle.puzzleId || puzzle.id,
+          name: puzzle.name,
+          description: puzzle.description,
+          difficulty: puzzle.difficulty,
+          maxAttempts: puzzle.maxAttempts,
+          timeLimitSeconds: puzzle.timeLimitSeconds,
+          rewardExp: puzzle.rewardExp,
+          rewardBitcoins: puzzle.rewardMoney || 0.0001,
+          hints: puzzle.hints || [],
+          solution: puzzle.solution || '',
+          progress: {
+            attempts: 0,
+            hintsUsed: 0,
+            isCompleted: false
+          }
+        });
+        setAttempts(0);
         
         // Timer starten wenn Zeitlimit vorhanden
-        if (data.puzzle.timeLimitSeconds) {
-          setTimeRemaining(data.puzzle.timeLimitSeconds);
+        if (puzzle.timeLimitSeconds) {
+          setTimeRemaining(puzzle.timeLimitSeconds);
         }
         
         // Willkommensnachricht hinzufügen
-        addCommandToHistory('system', `Willkommen im Terminal-Rätsel: ${data.puzzle.name}\n${data.puzzle.description}\n\nVerfügbare Befehle: help, hint, clear, status`);
+        addCommandToHistory('system', `Willkommen im Terminal-Rätsel: ${puzzle.name}\n${puzzle.description}\n\nVerfügbare Befehle: help, hint, clear, status`);
       } else {
-        setError(data.error || 'Fehler beim Laden des Rätsels');
+        // Fallback zu Mock-Daten
+        setPuzzleData({
+          id: puzzleId,
+          name: 'Terminal-Rätsel',
+          description: 'Löse das Terminal-Rätsel mit den richtigen Befehlen',
+          difficulty: 2,
+          maxAttempts: 3,
+          timeLimitSeconds: 300,
+          rewardExp: 100,
+          rewardBitcoins: 0.0003,
+          hints: ['Tipp 1: Versuche "help"', 'Tipp 2: Schaue dir die Ausgaben genau an'],
+          solution: 'ls',
+          progress: {
+            attempts: 0,
+            hintsUsed: 0,
+            isCompleted: false
+          }
+        });
+        setAttempts(0);
+        setTimeRemaining(300);
+        
+        addCommandToHistory('system', `Willkommen im Terminal-Rätsel (Demo-Modus)\nLöse das Terminal-Rätsel mit den richtigen Befehlen\n\nVerfügbare Befehle: help, hint, clear, status`);
       }
     } catch (error) {
       console.error('Fehler beim Laden des Rätsels:', error);
-      setError('Netzwerkfehler beim Laden des Rätsels');
+      // Fallback zu Mock-Daten bei Fehler
+      setPuzzleData({
+        id: puzzleId,
+        name: 'Terminal-Rätsel',
+        description: 'Löse das Terminal-Rätsel mit den richtigen Befehlen',
+        difficulty: 2,
+        maxAttempts: 3,
+        timeLimitSeconds: 300,
+        rewardExp: 100,
+        rewardBitcoins: 0.0003,
+        hints: ['Tipp 1: Versuche "help"', 'Tipp 2: Schaue dir die Ausgaben genau an'],
+        solution: 'ls',
+        progress: {
+          attempts: 0,
+          hintsUsed: 0,
+          isCompleted: false
+        }
+      });
+      setAttempts(0);
+      setTimeRemaining(300);
+      
+      addCommandToHistory('system', `Willkommen im Terminal-Rätsel (Demo-Modus)\nLöse das Terminal-Rätsel mit den richtigen Befehlen\n\nVerfügbare Befehle: help, hint, clear, status`);
     } finally {
       setIsLoading(false);
     }

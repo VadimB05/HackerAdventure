@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, XCircle, Clock, Lightbulb, Trophy, Coins } from 'lucide-react';
-import { useGameState } from './game-context';
 
 interface MultipleChoiceData {
   question: string;
@@ -41,15 +40,16 @@ interface PuzzleMultipleChoiceProps {
   };
   onSolve: (puzzleId: string, isCorrect: boolean) => void;
   onClose: () => void;
+  useMockData?: boolean;
 }
 
 export default function PuzzleMultipleChoice({
   puzzleId,
   puzzleData,
   onSolve,
-  onClose
+  onClose,
+  useMockData = false
 }: PuzzleMultipleChoiceProps) {
-  const { setCurrentView } = useGameState();
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -95,19 +95,36 @@ export default function PuzzleMultipleChoice({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/game/puzzles/${puzzleId}/solve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          answer: finalAnswer,
-          timeSpent: puzzleData.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : undefined
-        }),
-      });
+      let result;
+      
+      if (useMockData) {
+        // Mock-Logik für Test-Umgebung
+        const correctAnswer = puzzleData.data.multiple_choice.correct_answer;
+        const isCorrect = finalAnswer === correctAnswer;
+        
+        result = {
+          success: true,
+          isCorrect,
+          message: isCorrect ? 'Richtige Antwort!' : 'Falsche Antwort!',
+          attempts: attempts + 1
+        };
+      } else {
+        // Echte API-Anfrage
+        const response = await fetch(`/api/debug/puzzles/solve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            puzzleId,
+            questionId: '1', // Multiple-Choice-Rätsel haben nur eine "Frage"
+            answer: finalAnswer,
+            timeSpent: puzzleData.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : undefined
+          }),
+        });
 
-      const result = await response.json();
+        result = await response.json();
+      }
 
       if (result.success) {
         setIsCorrect(result.isCorrect);
