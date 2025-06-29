@@ -12,7 +12,6 @@ import StoryPopup from "./story-popup"
 import HackingMission from "./hacking-mission"
 import TerminalMission from "./terminal-mission"
 import MoneyPopup from "./money-popup"
-import CityView from "./city-view" // Neue Komponente für die Stadt
 import RoomView from "./room-view"
 import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
@@ -137,43 +136,32 @@ export default function GameLayout() {
               <Server className="mr-2 h-4 w-4" />
               Basement
             </Button>
-            <Button
-              variant={currentView === "city" ? "default" : "outline"}
-              onClick={() => setCurrentView("city")}
-              className="bg-black border-green-500 text-green-500 hover:bg-green-900"
-            >
-              <MapPin className="mr-2 h-4 w-4" />
-              City
-            </Button>
+            {/* City-Button nur anzeigen, wenn NICHT im Apartment oder Basement */}
+            {(currentView !== "apartment" && currentView !== "basement") && (
+              <Button
+                variant={currentView === "city" ? "default" : "outline"}
+                onClick={() => setCurrentView("city")}
+                className="bg-black border-green-500 text-green-500 hover:bg-green-900"
+              >
+                <MapPin className="mr-2 h-4 w-4" />
+                City
+              </Button>
+            )}
           </div>
 
-          {/* Digitale Tools */}
-          <div className="flex space-x-2">
-            <Button
-              variant={currentView === "terminal" ? "default" : "outline"}
-              onClick={() => setCurrentView("terminal")}
-              className="bg-black border-green-500 text-green-500 hover:bg-green-900"
-            >
-              <Monitor className="mr-2 h-4 w-4" />
-              Terminal
-            </Button>
-            <Button
-              variant={currentView === "smartphone" ? "default" : "outline"}
-              onClick={() => setCurrentView("smartphone")}
-              className="bg-black border-green-500 text-green-500 hover:bg-green-900"
-            >
-              <SmartphoneIcon className="mr-2 h-4 w-4" />
-              Phone
-            </Button>
-            <Button
-              variant={currentView === "darkroom" ? "default" : "outline"}
-              onClick={() => setCurrentView("darkroom")}
-              className="bg-black border-green-500 text-green-500 hover:bg-green-900"
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Darknet
-            </Button>
-          </div>
+          {/* Digitale Tools nur anzeigen, wenn NICHT im Apartment oder Basement */}
+          {(currentView !== "apartment" && currentView !== "basement") && (
+            <div className="flex space-x-2">
+              <Button
+                variant={currentView === "terminal" ? "default" : "outline"}
+                onClick={() => setCurrentView("terminal")}
+                className="bg-black border-green-500 text-green-500 hover:bg-green-900"
+              >
+                <Monitor className="mr-2 h-4 w-4" />
+                Terminal
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Raum-Informationen */}
@@ -200,11 +188,7 @@ export default function GameLayout() {
             onInventoryUpdate={handleInventoryUpdate}
           />
         )}
-        {currentView === "terminal" && <Terminal />}
-        {currentView === "smartphone" && <Smartphone />}
-        {currentView === "darkroom" && <DarknetChat />}
         {currentView === "basement" && <Basement />}
-        {currentView === "city" && <CityView />}
       </main>
 
       {/* Modals und Popups */}

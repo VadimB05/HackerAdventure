@@ -977,28 +977,6 @@ export default function RoomView({
         )}
       </AnimatePresence>
 
-      {/* "Weiter"-Button für freigeschaltete Exits */}
-      <AnimatePresence>
-        {availableExits.some(exit => exit.isUnlocked) && (
-          <motion.div
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 100 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="fixed right-4 top-4 z-40"
-          >
-            <Card className="bg-blue-900/90 backdrop-blur-sm border-blue-500">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-2">
-                  <ArrowRight className="h-4 w-4 text-blue-400" />
-                  <span className="text-sm text-blue-400 font-medium">Weiter</span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Raumwechsel-Animation */}
       <AnimatePresence>
         {isChangingRoom && (
