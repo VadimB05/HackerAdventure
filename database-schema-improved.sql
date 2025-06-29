@@ -151,6 +151,42 @@ CREATE TABLE puzzle_progress (
     INDEX idx_is_completed (is_completed)
 );
 
+-- Spieler-Fortschritt bei Missionen
+CREATE TABLE mission_progress (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    mission_id VARCHAR(100) NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
+    completed_at TIMESTAMP NULL,
+    puzzles_completed INT DEFAULT 0, -- Anzahl gelöster Rätsel in dieser Mission
+    rooms_visited INT DEFAULT 0, -- Anzahl besuchter Räume in dieser Mission
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (mission_id) REFERENCES missions(mission_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_mission (user_id, mission_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_mission_id (mission_id),
+    INDEX idx_is_completed (is_completed)
+);
+
+-- Speicherpunkte für automatisches und manuelles Speichern
+CREATE TABLE save_points (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    save_id VARCHAR(36) UNIQUE NOT NULL, -- UUID für den Speicherpunkt
+    user_id INT NOT NULL,
+    event_type ENUM('puzzle_solved', 'mission_completed', 'room_entered', 'item_collected', 'manual_save', 'game_started') NOT NULL,
+    event_data JSON DEFAULT '{}', -- Zusätzliche Event-Daten
+    game_state_snapshot JSON NOT NULL, -- Vollständiger Spielstand-Snapshot
+    is_auto_save BOOLEAN DEFAULT FALSE, -- Unterscheidung zwischen Auto- und Manuellspeicherung
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_event_type (event_type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_is_auto_save (is_auto_save)
+);
+
 -- Items/Inventar-Tabelle (erweitert)
 CREATE TABLE items (
     id INT AUTO_INCREMENT PRIMARY KEY,

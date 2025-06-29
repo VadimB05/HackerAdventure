@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Volume2, VolumeX, Play, SkipForward, MessageSquare, ArrowLeft } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { autoSave } from '@/lib/services/save-service'
 
 export default function IntroStory() {
   const { showStory } = useGameState()
@@ -17,12 +18,48 @@ export default function IntroStory() {
   const [hasPlayedOnce, setHasPlayedOnce] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [confirmAction, setConfirmAction] = useState<'skip' | 'close' | null>(null)
+  const [shouldShowIntro, setShouldShowIntro] = useState<boolean | null>(null)
 
   const VOICE_NOTE_PATH = '/sounds/voice/intro-narrator.mp3'
 
+  // Prüfe beim Mounten, ob ein Speicherpunkt existiert
+  useEffect(() => {
+    const checkIntroSave = async () => {
+      try {
+        const authResponse = await fetch('/api/auth/verify', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        if (!authResponse.ok) {
+          setShouldShowIntro(true)
+          return
+        }
+        const authData = await authResponse.json();
+        if (!authData.user || !authData.user.id) {
+          setShouldShowIntro(true)
+          return
+        }
+        const saveRes = await fetch(`/api/game/save?userId=${authData.user.id}`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+        if (!saveRes.ok) {
+          setShouldShowIntro(true)
+          return
+        }
+        const saveData = await saveRes.json();
+        const found = saveData.savePoints && saveData.savePoints.some((sp: any) => sp.eventType === 'game_started');
+        setShouldShowIntro(!found)
+      } catch (e) {
+        setShouldShowIntro(true)
+      }
+    }
+    checkIntroSave();
+  }, []);
+
   useEffect(() => {
     // Zeige die Sprachnotiz nur beim ersten Laden und nur einmal
-    if (!hasShownIntro) {
+    if (!hasShownIntro && shouldShowIntro) {
       const timer = setTimeout(() => {
         setShowVoiceNote(true)
         setHasShownIntro(true)
@@ -30,7 +67,7 @@ export default function IntroStory() {
 
       return () => clearTimeout(timer)
     }
-  }, [hasShownIntro])
+  }, [hasShownIntro, shouldShowIntro])
 
   // Cleanup beim Unmount
   useEffect(() => {
@@ -79,7 +116,7 @@ export default function IntroStory() {
     }
   }
 
-  const confirmSkip = () => {
+  const confirmSkip = async () => {
     // Stoppe das Audio
     stopSound(VOICE_NOTE_PATH)
     setIsPlaying(false)
@@ -91,9 +128,32 @@ export default function IntroStory() {
     setShowVoiceNote(false)
     setShowConfirmDialog(false)
     setConfirmAction(null)
+
+    // Speicherpunkt anlegen
+    try {
+      // Aktuelle User-ID holen
+      const authResponse = await fetch('/api/auth/verify', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (authResponse.ok) {
+        const authData = await authResponse.json();
+        if (authData.user && authData.user.id) {
+          await autoSave(authData.user.id, {
+            type: 'game_started',
+            data: { reason: 'Intro-Sprachnotiz übersprungen' },
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Fehler beim Speichern des Intro-Speicherpunkts:', e);
+      // Fehler ignorieren, Spiel geht weiter
+    }
   }
 
-  const confirmClose = () => {
+  const confirmClose = async () => {
     // Stoppe das Audio
     stopSound(VOICE_NOTE_PATH)
     setIsPlaying(false)
@@ -106,6 +166,29 @@ export default function IntroStory() {
     setShowText(false)
     setShowConfirmDialog(false)
     setConfirmAction(null)
+
+    // Speicherpunkt anlegen
+    try {
+      // Aktuelle User-ID holen
+      const authResponse = await fetch('/api/auth/verify', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (authResponse.ok) {
+        const authData = await authResponse.json();
+        if (authData.user && authData.user.id) {
+          await autoSave(authData.user.id, {
+            type: 'game_started',
+            data: { reason: 'Intro-Sprachnotiz geschlossen' },
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Fehler beim Speichern des Intro-Speicherpunkts:', e);
+      // Fehler ignorieren
+    }
   }
 
   const handleCancelConfirm = () => {
@@ -133,6 +216,11 @@ export default function IntroStory() {
     "Du weißt, wie das läuft… keine Spuren. Kein Vertrauen.",
     "Mach's gut, Bruder… und pass auf dich auf!"
   ]
+
+  if (shouldShowIntro === false) {
+    // Es gibt bereits einen Speicherpunkt, Intro nicht anzeigen
+    return null;
+  }
 
   return (
     <AnimatePresence>

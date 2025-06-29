@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getSavePoints } from '@/lib/services/save-service';
 
 interface User {
   id: number;
@@ -66,6 +67,7 @@ interface GameContextType {
   playerStats: PlayerStats | null;
   isLoading: boolean;
   hasGameProgress: boolean;
+  hasSkippedIntro: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   startNewGame: () => Promise<void>;
@@ -91,11 +93,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasGameProgress, setHasGameProgress] = useState(false);
+  const [hasSkippedIntro, setHasSkippedIntro] = useState(false);
 
   // Beim Laden prüfen, ob User angemeldet ist
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  // Prüfe Intro-Speicherpunkt, sobald User gesetzt ist
+  useEffect(() => {
+    if (user) {
+      checkIntroSkipped();
+    }
+  }, [user]);
 
   const checkAuthStatus = async () => {
     try {
@@ -124,6 +134,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setHasGameProgress(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const checkIntroSkipped = async () => {
+    try {
+      if (!user) return;
+      const result = await getSavePoints(user.id);
+      if (result.success && result.savePoints) {
+        const found = result.savePoints.some(sp => sp.eventType === 'game_started');
+        console.log('Intro-Speicherpunkt gefunden:', found, result.savePoints);
+        setHasSkippedIntro(found);
+      }
+    } catch (e) {
+      setHasSkippedIntro(false);
     }
   };
 
@@ -308,6 +332,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     playerStats,
     isLoading,
     hasGameProgress,
+    hasSkippedIntro,
     login,
     logout,
     startNewGame,
