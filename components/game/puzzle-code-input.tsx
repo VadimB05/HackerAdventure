@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,19 +7,24 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { CheckCircle, XCircle, Clock, Lightbulb, Trophy, Lock, Eye, EyeOff } from 'lucide-react';
 import { solvePuzzle, type PuzzleData } from '@/lib/services/puzzle-service';
+import { useGameState } from './game-context';
 
 interface PuzzleCodeInputProps {
   puzzleId: string;
+  puzzleData?: PuzzleData;
   onSolve: (puzzleId: string, isCorrect: boolean) => void;
   onClose: () => void;
 }
 
 export default function PuzzleCodeInput({
   puzzleId,
+  puzzleData,
   onSolve,
   onClose
 }: PuzzleCodeInputProps) {
-  const [puzzleData, setPuzzleData] = useState<PuzzleData | null>(null);
+  // Game-Context für Alarm-Level
+  const { increaseAlarmLevel, alarmLevel } = useGameState();
+  
   const [codeInput, setCodeInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -32,6 +37,28 @@ export default function PuzzleCodeInput({
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showTrophy, setShowTrophy] = useState(false);
+  const [lastAlarmLevel, setLastAlarmLevel] = useState(0);
+  const [maxAttempts, setMaxAttempts] = useState(0);
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
+
+  // Timer für Zeitlimit
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startTimer = () => {
+    if (timeLimit && timeLimit > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev === null || prev <= 1) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
 
   // Timer für Zeitlimit
   useEffect(() => {
@@ -55,106 +82,150 @@ export default function PuzzleCodeInput({
     try {
       setIsLoading(true);
       setError(null);
+      
+      // States zurücksetzen
+      setShowResult(false);
+      setIsCorrect(false);
+      setShowTrophy(false);
 
-      const result = await fetch(`/api/debug/puzzles/${puzzleId}`);
-      const data = await result.json();
-
-      if (result.ok && data.success) {
-        // Debug-API Format zu Code-Format konvertieren
-        const puzzle = data.puzzle;
-        setPuzzleData({
-          puzzleId: puzzle.puzzleId || puzzle.id,
-          roomId: puzzle.roomId || 'bedroom',
-          name: puzzle.name,
-          description: puzzle.description,
-          type: puzzle.type || 'code',
-          difficulty: puzzle.difficulty,
-          maxAttempts: puzzle.maxAttempts,
-          timeLimitSeconds: puzzle.timeLimitSeconds,
-          rewardMoney: puzzle.rewardMoney || 0.0001,
-          rewardExp: puzzle.rewardExp,
-          isRequired: puzzle.isRequired || false,
-          isHidden: puzzle.isHidden || false,
-          hints: puzzle.hints || [],
-          data: puzzle.questions || {},
-          progress: {
-            attempts: 0,
-            hintsUsed: 0,
-            isCompleted: false,
-            bestTimeSeconds: null,
-            completedAt: null
-          }
-        });
-        setAttempts(0);
+      // Wenn puzzleData als Prop vorhanden ist, verwende diese
+      if (puzzleData) {
+        console.log('Verwende puzzleData aus Props:', puzzleData);
+        
+        // Versuche aus der API-Response laden
+        const attemptsFromApi = puzzleData.progress?.attempts || 0;
+        console.log(`[DEBUG] Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
+        setAttempts(attemptsFromApi);
+        setMaxAttempts(puzzleData.maxAttempts);
         
         // Timer starten wenn Zeitlimit vorhanden
-        if (puzzle.timeLimitSeconds) {
-          setTimeRemaining(puzzle.timeLimitSeconds);
+        if (puzzleData.timeLimitSeconds && puzzleData.timeLimitSeconds > 0) {
+          setTimeLimit(puzzleData.timeLimitSeconds);
+          setTimeRemaining(puzzleData.timeLimitSeconds);
+          startTimer();
         }
-      } else {
-        // Fallback zu Mock-Daten
-        setPuzzleData({
-          puzzleId: puzzleId,
-          roomId: 'bedroom',
-          name: 'Code-Rätsel',
-          description: 'Finde das versteckte Passwort im Code',
-          type: 'code',
-          difficulty: 2,
-          maxAttempts: 3,
-          timeLimitSeconds: 300,
-          rewardMoney: 0.0003,
-          rewardExp: 100,
-          isRequired: false,
-          isHidden: false,
-          hints: ['Tipp 1: Schaue dir die Variablen an', 'Tipp 2: Versuche "password"'],
-          data: {},
-          progress: {
-            attempts: 0,
-            hintsUsed: 0,
-            isCompleted: false,
-            bestTimeSeconds: null,
-            completedAt: null
-          }
-        });
-        setAttempts(0);
-        setTimeRemaining(300);
+        
+        setIsLoading(false);
+        return;
       }
+
+      // Fallback: Lade Puzzle von API
+      const response = await fetch(`/api/game/puzzles/${puzzleId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Laden des Rätsels');
+      }
+
+      if (!data.success || !data.puzzle) {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+
+      const puzzle = data.puzzle;
+      console.log('[DEBUG] Geladenes Puzzle:', puzzle);
+      
+      // Versuche aus der API-Response laden
+      const attemptsFromApi = puzzle.progress?.attempts || 0;
+      console.log(`[DEBUG] Lade Versuche aus API: ${attemptsFromApi}/${puzzle.maxAttempts}`);
+      setAttempts(attemptsFromApi);
+      setMaxAttempts(puzzle.maxAttempts);
+      
+      // Ergebnis-States zurücksetzen
+      setShowResult(false);
+      setIsCorrect(false);
+      setShowTrophy(false);
+      
+      // Timer starten wenn Zeitlimit vorhanden
+      if (puzzle.timeLimitSeconds && puzzle.timeLimitSeconds > 0) {
+        setTimeRemaining(puzzle.timeLimitSeconds);
+      }
+
     } catch (error) {
       console.error('Fehler beim Laden des Rätsels:', error);
-      // Fallback zu Mock-Daten bei Fehler
-      setPuzzleData({
-        puzzleId: puzzleId,
-        roomId: 'bedroom',
-        name: 'Code-Rätsel',
-        description: 'Finde das versteckte Passwort im Code',
-        type: 'code',
-        difficulty: 2,
-        maxAttempts: 3,
-        timeLimitSeconds: 300,
-        rewardMoney: 0.0003,
-        rewardExp: 100,
-        isRequired: false,
-        isHidden: false,
-        hints: ['Tipp 1: Schaue dir die Variablen an', 'Tipp 2: Versuche "password"'],
-        data: {},
-        progress: {
-          attempts: 0,
-          hintsUsed: 0,
-          isCompleted: false,
-          bestTimeSeconds: null,
-          completedAt: null
-        }
-      });
-      setAttempts(0);
-      setTimeRemaining(300);
+      setError(error instanceof Error ? error.message : 'Unbekannter Fehler');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    if (puzzleData) {
+      // Versuche aus der API-Response laden
+      const attemptsFromApi = puzzleData.progress?.attempts || 0;
+      console.log(`[DEBUG] Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
+      setAttempts(attemptsFromApi);
+      setMaxAttempts(puzzleData.maxAttempts);
+      
+      // Ergebnis-States zurücksetzen
+      setShowResult(false);
+      setIsCorrect(false);
+      setShowTrophy(false);
+    }
+  }, [puzzleData]);
+
+  // Lade Puzzle-Daten beim ersten Laden
+  useEffect(() => {
     loadPuzzle();
   }, [puzzleId]);
+
+  // Reset alle States beim Öffnen des Rätsels
+  useEffect(() => {
+    if (puzzleId) {
+      console.log('[DEBUG] Rätsel geöffnet - setze alle States zurück');
+      setShowResult(false);
+      setIsCorrect(false);
+      setShowTrophy(false);
+      setCodeInput('');
+      setError(null);
+    }
+  }, [puzzleId]);
+
+  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
+  useEffect(() => {
+    if (alarmLevel > lastAlarmLevel) {
+      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
+      setLastAlarmLevel(alarmLevel);
+      
+      // Versuche zurücksetzen
+      resetPuzzleAttempts();
+      
+      // Rätsel NICHT schließen - nur Versuche zurücksetzen
+      // Das Rätsel soll weiter spielbar bleiben
+    }
+  }, [alarmLevel, lastAlarmLevel]);
+
+  // Versuche in der Datenbank zurücksetzen
+  const resetPuzzleAttempts = async () => {
+    try {
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          reason: 'Alarm-Level erhöht - Versuche zurückgesetzt'
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Versuche erfolgreich zurückgesetzt');
+        // Versuche sofort auf 0 setzen
+        setAttempts(0);
+        
+        // Kurze Nachricht anzeigen
+        setShowResult(true);
+        setIsCorrect(false);
+        setTimeout(() => {
+          setShowResult(false);
+        }, 3000);
+      } else {
+        console.log('Fehler beim Zurücksetzen der Versuche');
+      }
+    } catch (error) {
+      console.error('Fehler beim Zurücksetzen der Versuche:', error);
+    }
+  };
 
   const handleCodeChange = (value: string) => {
     setCodeInput(value);
@@ -166,52 +237,95 @@ export default function PuzzleCodeInput({
   };
 
   const handleSubmit = async () => {
-    if (!codeInput.trim() || isSubmitting || attempts >= (puzzleData?.maxAttempts || 0)) return;
+    if (!codeInput.trim() || isSubmitting) return;
 
-    setIsSubmitting(true);
+    console.log(`[DEBUG] Submit - Aktuelle Versuche: ${attempts}/${maxAttempts}`);
+
+    // Prüfe ob maximale Versuche erreicht sind
+    if (attempts >= maxAttempts) {
+      console.log(`[DEBUG] Maximale Versuche erreicht (${attempts}/${maxAttempts}) - erhöhe Alarm-Level`);
+      increaseAlarmLevel('Maximale Versuche im Code-Rätsel erreicht');
+      return;
+    }
 
     try {
-      // Debug-Solve-API verwenden (ohne Authentifizierung)
-      const response = await fetch('/api/debug/puzzles/solve', {
+      setIsSubmitting(true);
+      setShowResult(false);
+
+      console.log(`[DEBUG] Sende Antwort an API: ${codeInput.trim()}`);
+
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/solve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
-          puzzleId,
-          questionId: '1', // Code-Rätsel haben nur eine "Frage"
           answer: codeInput.trim(),
-          timeSpent: puzzleData?.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : undefined
+          timeSpent: puzzleData?.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : 0
         }),
       });
 
-      const result = await response.json();
+      const data = await response.json();
+      console.log(`[DEBUG] API Response:`, data);
 
-      if (result.success) {
-        setIsCorrect(result.isCorrect);
-        setAttempts(result.attempts);
-        setShowResult(true);
-        
-        if (result.isCorrect) {
-          // Bei richtiger Antwort: Trophäe anzeigen
+      if (response.ok && data.success) {
+        // Versuche aktualisieren
+        console.log(`[DEBUG] Versuche aktualisiert: ${data.attempts}/${data.maxAttempts}`);
+        setAttempts(data.attempts);
+
+        if (data.isCorrect) {
+          setIsCorrect(true);
+          setShowResult(true);
+          
+          // Mission-Progress prüfen nach erfolgreichem Lösen
+          try {
+            const missionResponse = await fetch('/api/game/progress/mission', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                roomId: puzzleData?.roomId || 'basement'
+              }),
+            });
+
+            const missionData = await missionResponse.json();
+            console.log(`[DEBUG] Mission Progress Response:`, missionData);
+
+            if (missionData.success && missionData.isCompleted) {
+              console.log(`[DEBUG] Mission abgeschlossen! Belohnungen:`, missionData.rewards);
+              // Hier könntest du eine Benachrichtigung anzeigen
+            }
+          } catch (missionError) {
+            console.error('Fehler beim Prüfen des Mission-Progress:', missionError);
+          }
+
           setTimeout(() => {
-            setShowResult(false);
-            setShowTrophy(true);
+            onSolve(puzzleId, true);
           }, 2000);
         } else {
-          // Bei falscher Antwort: Ergebnis nach 3 Sekunden ausblenden und Input zurücksetzen
-          setTimeout(() => {
-            setShowResult(false);
-            setCodeInput('');
-          }, 3000);
+          setIsCorrect(false);
+          setShowResult(true);
+          
+          // Prüfe ob maximale Versuche erreicht sind
+          if (data.maxAttemptsReached) {
+            console.log(`[DEBUG] API meldet maxAttemptsReached - erhöhe Alarm-Level`);
+            increaseAlarmLevel('Maximale Versuche im Code-Rätsel erreicht');
+          }
         }
       } else {
-        console.error('Fehler beim Lösen des Rätsels:', result.error);
-        setError(result.error || 'Unbekannter Fehler beim Lösen des Rätsels');
+        // Prüfe ob es ein "Maximale Versuche" Fehler ist
+        if (data.error && data.error.includes('Maximale Anzahl Versuche')) {
+          console.log(`[DEBUG] API Fehler: Maximale Versuche - erhöhe Alarm-Level`);
+          increaseAlarmLevel('Maximale Versuche im Code-Rätsel erreicht');
+        } else {
+          console.error('Fehler beim Lösen des Rätsels:', data.error);
+        }
       }
     } catch (error) {
-      console.error('Netzwerkfehler:', error);
-      setError('Netzwerkfehler beim Lösen des Rätsels');
+      console.error('Fehler beim Lösen des Rätsels:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -328,7 +442,7 @@ export default function PuzzleCodeInput({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -501,23 +615,13 @@ export default function PuzzleCodeInput({
                   
                   <Button
                     onClick={handleSubmit}
-                    disabled={!codeInput.trim() || isSubmitting || attempts >= puzzleData.maxAttempts}
+                    disabled={!codeInput.trim() || isSubmitting}
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
                     {isSubmitting ? 'Prüfe...' : 'Code absenden'}
                   </Button>
                 </div>
               </div>
-            )}
-
-            {/* Maximale Versuche erreicht */}
-            {attempts >= puzzleData.maxAttempts && (
-              <Alert className="border-red-500 bg-red-500/10">
-                <XCircle className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-red-400">
-                  Maximale Anzahl Versuche erreicht. Das Rätsel ist gescheitert.
-                </AlertDescription>
-              </Alert>
             )}
           </CardContent>
         </Card>

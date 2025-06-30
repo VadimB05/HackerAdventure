@@ -15,7 +15,7 @@ interface GameState {
   currentRoom: string;
   inventory: string[];
   progress: Record<string, any>;
-  money: number;
+  bitcoins: number;
   experiencePoints: number;
   level: number;
   currentMission?: string | null;
@@ -38,7 +38,7 @@ interface MissionData {
   description: string;
   difficulty: number;
   requiredLevel: number;
-  rewardMoney: number;
+  rewardBitcoins: number;
   rewardExp: number;
 }
 
@@ -53,7 +53,7 @@ interface PlayerStats {
   puzzlesSolved: number;
   roomsVisited: number;
   missionsCompleted: number;
-  totalMoneyEarned: number;
+  totalBitcoinsEarned: number;
   totalExpEarned: number;
   playTimeMinutes: number;
 }
@@ -152,7 +152,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   };
 
   const checkGameProgress = async (): Promise<boolean> => {
+    console.log('checkGameProgress called, user:', user);
+    
     if (!user) {
+      console.log('No user, setting hasGameProgress to false');
       setGameState(null);
       setRoomData(null);
       setMissionData(null);
@@ -163,6 +166,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      console.log('Fetching game state from API...');
       const response = await fetch('/api/game/state', {
         method: 'GET',
         credentials: 'include'
@@ -170,14 +174,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Game state API response:', data);
+        console.log('API says hasGameProgress:', data.hasGameProgress);
+        
         setGameState(data.gameState);
         setRoomData(data.roomData);
         setMissionData(data.missionData);
         setSolvedPuzzles(data.solvedPuzzles || []);
         setPlayerStats(data.playerStats);
         setHasGameProgress(data.hasGameProgress);
+        
+        console.log('Setting hasGameProgress to:', data.hasGameProgress);
+        console.log('Game state:', data.gameState);
+        console.log('Solved puzzles:', data.solvedPuzzles);
+        
         return data.hasGameProgress;
       } else {
+        console.log('Game state API failed:', response.status, response.statusText);
         setGameState(null);
         setRoomData(null);
         setMissionData(null);
@@ -288,8 +301,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   };
 
   const continueGame = async (): Promise<void> => {
-    if (hasGameProgress) {
-      router.push('/game');
+    if (hasGameProgress && gameState) {
+      // Spielstandsdaten als URL-Parameter übergeben
+      const params = new URLSearchParams({
+        continue: 'true',
+        room: gameState.currentRoom,
+        bitcoins: gameState.bitcoins.toString(),
+        exp: gameState.experiencePoints.toString(),
+        level: gameState.level.toString()
+      });
+      
+      if (gameState.currentMission) {
+        params.append('mission', gameState.currentMission);
+      }
+      
+      router.push(`/game?${params.toString()}`);
     }
   };
 

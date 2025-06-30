@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
         // Existierenden Spielstand auf Standardwerte zurücksetzen
         await executeUpdate(
           'UPDATE game_states SET current_room = ?, inventory = ?, progress = ?, bitcoins = ?, experience_points = ?, level = ?, current_mission = ? WHERE user_id = ?',
-          ['intro', '[]', '{}', 0.00000000, 0, 1, 'mission_001', userId]
+          ['intro', '[]', '{}', 0.00000000, 0, 1, null, userId]
         );
 
         // Spieler-Statistiken zurücksetzen
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         // Neuen Spielstand erstellen
         await executeUpdate(
           'INSERT INTO game_states (user_id, current_room, inventory, progress, bitcoins, experience_points, level, current_mission) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [userId, 'intro', '[]', '{}', 0.00000000, 0, 1, 'mission_001']
+          [userId, 'intro', '[]', '{}', 0.00000000, 0, 1, null]
         );
 
         // Spieler-Statistiken erstellen
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         bitcoins: 0.00000000,
         experiencePoints: 0,
         level: 1,
-        currentMission: 'mission_001'
+        currentMission: null
       };
 
       return NextResponse.json({

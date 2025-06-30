@@ -65,4 +65,42 @@ export async function executeUpdate(
   const sanitizedParams = sanitizeParams(params);
   const [result] = await db.execute(query, sanitizedParams);
   return result as any;
+}
+
+// Hilfsfunktion für Transaktionen (verwendet query statt execute)
+export async function executeTransaction(
+  queries: { query: string; params?: any[] }[]
+): Promise<void> {
+  const db = await connectDB();
+  const connection = await db.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+    
+    for (const { query, params = [] } of queries) {
+      const sanitizedParams = sanitizeParams(params);
+      await connection.query(query, sanitizedParams);
+    }
+    
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+// Hilfsfunktion für einzelne Transaktionsbefehle
+export async function executeTransactionCommand(
+  command: string
+): Promise<void> {
+  const db = await connectDB();
+  const connection = await db.getConnection();
+  
+  try {
+    await connection.query(command);
+  } finally {
+    connection.release();
+  }
 } 

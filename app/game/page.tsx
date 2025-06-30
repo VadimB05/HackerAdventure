@@ -1,10 +1,28 @@
+"use client";
+
 import GameLayout from "@/components/game/game-layout"
 import { GameProvider } from "@/components/game/game-context"
 import IntroStory from "@/components/game/intro-story"
+import { useSearchParams } from 'next/navigation'
 
 export default function GamePage() {
+  const searchParams = useSearchParams();
+  const continueGame = searchParams.get('continue') === 'true';
+  const roomId = searchParams.get('room') || 'intro';
+  const bitcoins = searchParams.get('bitcoins') || '0';
+  const exp = searchParams.get('exp') || '0';
+  const level = searchParams.get('level') || '1';
+  const mission = searchParams.get('mission');
+
   return (
-    <GameProvider>
+    <GameProvider 
+      continueGame={continueGame}
+      initialRoom={roomId}
+      initialBitcoins={parseFloat(bitcoins)}
+      initialExp={parseInt(exp)}
+      initialLevel={parseInt(level)}
+      initialMission={mission}
+    >
       <GameLayout />
       <IntroStory />
     </GameProvider>

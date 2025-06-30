@@ -48,14 +48,14 @@ export default function DragDropFeedback({
             isValid ? 'bg-green-500' : 'bg-red-500'
           } blur-sm`}
           style={{ 
-            width: '120px', 
-            height: '120px',
+            width: '160px', 
+            height: '140px',
             transform: 'translate(-50%, -50%)'
           }}
         />
         
         {/* Haupt-Feedback */}
-        <div className={`relative flex flex-col items-center justify-center w-24 h-24 rounded-lg border-2 ${
+        <div className={`relative flex flex-col items-center justify-center min-w-32 min-h-24 px-4 py-3 rounded-lg border-2 ${
           isValid 
             ? 'bg-green-600/90 border-green-400 text-green-100' 
             : 'bg-red-600/90 border-red-400 text-red-100'
@@ -81,7 +81,7 @@ export default function DragDropFeedback({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className="text-xs font-medium text-center px-2"
+              className="text-sm font-medium text-center leading-relaxed"
             >
               {message}
             </motion.p>
@@ -97,8 +97,8 @@ export default function DragDropFeedback({
             isValid ? 'border-green-400' : 'border-red-400'
           }`}
           style={{ 
-            width: '120px', 
-            height: '120px',
+            width: '160px', 
+            height: '140px',
             transform: 'translate(-50%, -50%)'
           }}
         />

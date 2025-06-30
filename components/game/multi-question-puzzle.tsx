@@ -488,8 +488,8 @@ export default function MultiQuestionPuzzle({
                   {!showResult ? (
                     <Button
                       onClick={handleSubmit}
-                      disabled={!selectedAnswer || isSubmitting || attempts >= puzzleData.maxAttempts}
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      disabled={!selectedAnswer || isSubmitting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       {isSubmitting ? 'Prüfe...' : 'Antwort absenden'}
                     </Button>

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, XCircle, Clock, Lightbulb, Trophy, Coins } from 'lucide-react';
+import { useGameState } from './game-context';
 
 interface MultipleChoiceData {
   question: string;
@@ -29,6 +30,7 @@ interface PuzzleMultipleChoiceProps {
     rewardMoney: number;
     rewardExp: number;
     hints: string[];
+    roomId?: string;
     data: {
       multiple_choice: MultipleChoiceData;
     };
@@ -45,24 +47,32 @@ interface PuzzleMultipleChoiceProps {
 
 export default function PuzzleMultipleChoice({
   puzzleId,
-  puzzleData,
+  puzzleData: initialPuzzleData,
   onSolve,
   onClose,
   useMockData = false
 }: PuzzleMultipleChoiceProps) {
+  // Game-Context für Alarm-Level
+  const { increaseAlarmLevel, alarmLevel } = useGameState();
+  
+  const [puzzleData, setPuzzleData] = useState<PuzzleMultipleChoiceProps['puzzleData'] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [attempts, setAttempts] = useState(puzzleData.progress.attempts);
+  const [roomId, setRoomId] = useState<string>('intro');
+  const [lastAlarmLevel, setLastAlarmLevel] = useState(0);
 
   // Timer für Zeitlimit
   useEffect(() => {
-    if (puzzleData.timeLimitSeconds && !puzzleData.progress.isCompleted) {
+    if (puzzleData?.timeLimitSeconds && !puzzleData.progress.isCompleted) {
       setTimeRemaining(puzzleData.timeLimitSeconds);
       
       const timer = setInterval(() => {
@@ -77,7 +87,21 @@ export default function PuzzleMultipleChoice({
 
       return () => clearInterval(timer);
     }
-  }, [puzzleData.timeLimitSeconds, puzzleData.progress.isCompleted]);
+  }, [puzzleData?.timeLimitSeconds, puzzleData?.progress.isCompleted]);
+
+  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
+  useEffect(() => {
+    if (alarmLevel > lastAlarmLevel) {
+      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
+      setLastAlarmLevel(alarmLevel);
+      
+      // Versuche zurücksetzen
+      resetPuzzleAttempts();
+      
+      // Rätsel NICHT schließen - nur Versuche zurücksetzen
+      // Das Rätsel soll weiter spielbar bleiben
+    }
+  }, [alarmLevel, lastAlarmLevel]);
 
   // Zeit abgelaufen
   useEffect(() => {
@@ -86,69 +110,215 @@ export default function PuzzleMultipleChoice({
     }
   }, [timeRemaining]);
 
-  const handleSubmit = async (answer?: string) => {
-    if (isSubmitting || attempts >= puzzleData.maxAttempts) return;
-    
-    const finalAnswer = answer !== undefined ? answer : selectedAnswer;
-    if (!finalAnswer) return;
-
-    setIsSubmitting(true);
-
+  // Versuche in der Datenbank zurücksetzen
+  const resetPuzzleAttempts = async () => {
     try {
-      let result;
-      
-      if (useMockData) {
-        // Mock-Logik für Test-Umgebung
-        const correctAnswer = puzzleData.data.multiple_choice.correct_answer;
-        const isCorrect = finalAnswer === correctAnswer;
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          reason: 'Alarm-Level erhöht - Versuche zurückgesetzt'
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Versuche erfolgreich zurückgesetzt');
+        // Versuche sofort auf 0 setzen
+        setAttempts(0);
         
-        result = {
-          success: true,
-          isCorrect,
-          message: isCorrect ? 'Richtige Antwort!' : 'Falsche Antwort!',
-          attempts: attempts + 1
-        };
-      } else {
-        // Echte API-Anfrage
-        const response = await fetch(`/api/debug/puzzles/solve`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            puzzleId,
-            questionId: '1', // Multiple-Choice-Rätsel haben nur eine "Frage"
-            answer: finalAnswer,
-            timeSpent: puzzleData.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : undefined
-          }),
-        });
-
-        result = await response.json();
-      }
-
-      if (result.success) {
-        setIsCorrect(result.isCorrect);
-        setAttempts(result.attempts);
+        // Kurze Nachricht anzeigen
         setShowResult(true);
-        
-        // Erfolgsmeldung nach kurzer Verzögerung
+        setIsCorrect(false);
         setTimeout(() => {
-          onSolve(puzzleId, result.isCorrect);
-        }, 2000);
+          setShowResult(false);
+        }, 3000);
       } else {
-        console.error('Fehler beim Lösen des Rätsels:', result.error);
+        console.log('Fehler beim Zurücksetzen der Versuche');
       }
     } catch (error) {
-      console.error('Netzwerkfehler:', error);
+      console.error('Fehler beim Zurücksetzen der Versuche:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (puzzleData) {
+      // Versuche aus der API-Response laden
+      const attemptsFromApi = puzzleData.progress?.attempts || 0;
+      console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
+      setAttempts(attemptsFromApi);
+      setMaxAttempts(puzzleData.maxAttempts);
+    }
+  }, [puzzleData]);
+
+  // Lade Puzzle-Daten beim ersten Laden
+  useEffect(() => {
+    loadPuzzle();
+  }, [puzzleId]);
+
+  // Reset alle States beim Öffnen des Rätsels
+  useEffect(() => {
+    if (puzzleId) {
+      console.log('[DEBUG] Rätsel geöffnet - setze alle States zurück');
+      setShowResult(false);
+      setIsCorrect(false);
+      setSelectedAnswer('');
+    }
+  }, [puzzleId]);
+
+  const loadPuzzle = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Wenn puzzleData als Prop vorhanden ist, verwende diese
+      if (initialPuzzleData) {
+        console.log('Verwende puzzleData aus Props:', initialPuzzleData);
+        
+        // Versuche aus der API-Response laden
+        const attemptsFromApi = initialPuzzleData.progress?.attempts || 0;
+        console.log(`Lade Versuche aus API: ${attemptsFromApi}/${initialPuzzleData.maxAttempts}`);
+        setAttempts(attemptsFromApi);
+        setMaxAttempts(initialPuzzleData.maxAttempts);
+        
+        setIsLoading(false);
+        setPuzzleData(initialPuzzleData);
+        setRoomId(initialPuzzleData.roomId || 'intro');
+        return;
+      }
+
+      // Fallback: Lade Puzzle von API
+      const response = await fetch(`/api/game/puzzles/${puzzleId}`, {
+        credentials: 'include'
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Laden des Rätsels');
+      }
+
+      if (!data.success || !data.puzzle) {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+
+      const puzzle = data.puzzle;
+      console.log('Geladenes Puzzle:', puzzle);
+      
+      // Versuche aus der API-Response laden
+      const attemptsFromApi = puzzle.progress?.attempts || 0;
+      console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzle.maxAttempts}`);
+      setAttempts(attemptsFromApi);
+      setMaxAttempts(puzzle.maxAttempts);
+
+      setPuzzleData(puzzle);
+      setRoomId(puzzle.roomId || 'intro');
+
+    } catch (error) {
+      console.error('Fehler beim Laden des Rätsels:', error);
+      setError(error instanceof Error ? error.message : 'Unbekannter Fehler');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (answer?: string) => {
+    const answerToSubmit = answer || selectedAnswer;
+    if (!answerToSubmit || isSubmitting) return;
+
+    // Prüfe ob maximale Versuche erreicht sind
+    if (attempts >= maxAttempts) {
+      increaseAlarmLevel('Maximale Versuche im Multiple-Choice-Rätsel erreicht');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setShowResult(false);
+
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/solve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ answer: answerToSubmit }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Versuche aktualisieren
+        setAttempts(data.attempts);
+
+        if (data.isCorrect) {
+          setIsCorrect(true);
+          setShowResult(true);
+          
+          // Mission-Progress prüfen nach erfolgreichem Lösen
+          try {
+            const missionResponse = await fetch('/api/game/progress/mission', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                roomId: roomId
+              }),
+            });
+
+            const missionData = await missionResponse.json();
+            console.log(`[DEBUG] Mission Progress Response:`, missionData);
+
+            if (missionData.success && missionData.isCompleted) {
+              console.log(`[DEBUG] Mission abgeschlossen! Belohnungen:`, missionData.rewards);
+              // Hier könntest du eine Benachrichtigung anzeigen
+            }
+          } catch (missionError) {
+            console.error('Fehler beim Prüfen des Mission-Progress:', missionError);
+          }
+          
+          setTimeout(() => {
+            onSolve(puzzleId, true);
+          }, 2000);
+        } else {
+          setIsCorrect(false);
+          setShowResult(true);
+          
+          // Prüfe ob maximale Versuche erreicht sind
+          if (data.maxAttemptsReached) {
+            increaseAlarmLevel('Maximale Versuche im Multiple-Choice-Rätsel erreicht');
+          }
+        }
+      } else {
+        // Prüfe ob es ein "Maximale Versuche" Fehler ist
+        if (data.error && data.error.includes('Maximale Anzahl Versuche')) {
+          increaseAlarmLevel('Maximale Versuche im Multiple-Choice-Rätsel erreicht');
+        } else {
+          console.error('Fehler beim Lösen des Rätsels:', data.error);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Lösen des Rätsels:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleHint = () => {
-    if (currentHintIndex < puzzleData.hints.length) {
+    if (puzzleData && currentHintIndex < (puzzleData.hints?.length || 0)) {
       setShowHint(true);
       setCurrentHintIndex(prev => prev + 1);
+    }
+  };
+
+  const handleAnswerChange = (value: string) => {
+    setSelectedAnswer(value);
+    // Verstecke das vorherige Ergebnis, wenn eine neue Antwort ausgewählt wird
+    if (showResult && !isCorrect) {
+      setShowResult(false);
     }
   };
 
@@ -173,6 +343,25 @@ export default function PuzzleMultipleChoice({
       default: return 'Unbekannt';
     }
   };
+
+  if (!puzzleData) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-black/80 border border-red-500 rounded-lg p-8 max-w-md mx-4">
+          <div className="text-red-400 text-center">
+            <h3 className="text-xl font-bold mb-4">Fehler</h3>
+            <p className="mb-6">Rätsel konnte nicht geladen werden</p>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+            >
+              Schließen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (puzzleData.progress.isCompleted) {
     return (
@@ -206,7 +395,7 @@ export default function PuzzleMultipleChoice({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -298,8 +487,8 @@ export default function PuzzleMultipleChoice({
               {/* Antwortoptionen */}
               <RadioGroup
                 value={selectedAnswer}
-                onValueChange={setSelectedAnswer}
-                disabled={isSubmitting || showResult}
+                onValueChange={handleAnswerChange}
+                disabled={isSubmitting || (showResult && isCorrect)}
                 className="space-y-3"
               >
                 {puzzleData.data.multiple_choice.options.map((option, index) => (
@@ -345,8 +534,8 @@ export default function PuzzleMultipleChoice({
             {/* Belohnungen */}
             {showResult && isCorrect && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 className="flex justify-center gap-4 p-4 bg-yellow-500/10 border border-yellow-500 rounded-lg"
               >
                 {puzzleData.rewardMoney > 0 && (
@@ -367,15 +556,14 @@ export default function PuzzleMultipleChoice({
             {/* Aktionen */}
             <div className="flex justify-between items-center pt-4">
               <div className="flex gap-2">
-                {puzzleData.hints.length > 0 && currentHintIndex < puzzleData.hints.length && (
+                {puzzleData.hints && puzzleData.hints.length > 0 && currentHintIndex < puzzleData.hints.length && (
                   <Button
                     onClick={handleHint}
                     variant="outline"
                     size="sm"
                     className="border-yellow-500 text-yellow-400 hover:bg-yellow-500/10"
-                    disabled={isSubmitting}
                   >
-                    <Lightbulb className="h-4 w-4 mr-2" />
+                    <Lightbulb className="h-4 w-4 mr-1" />
                     Hinweis ({currentHintIndex + 1}/{puzzleData.hints.length})
                   </Button>
                 )}
@@ -386,30 +574,18 @@ export default function PuzzleMultipleChoice({
                   onClick={onClose}
                   variant="outline"
                   className="border-gray-500 text-gray-400 hover:bg-gray-500/10"
-                  disabled={isSubmitting}
                 >
-                  Abbrechen
+                  Schließen
                 </Button>
-                
                 <Button
                   onClick={() => handleSubmit()}
-                  disabled={!selectedAnswer || isSubmitting || attempts >= puzzleData.maxAttempts}
+                  disabled={!selectedAnswer || isSubmitting || (showResult && isCorrect)}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   {isSubmitting ? 'Prüfe...' : 'Antwort absenden'}
                 </Button>
               </div>
             </div>
-
-            {/* Maximale Versuche erreicht */}
-            {attempts >= puzzleData.maxAttempts && !puzzleData.progress.isCompleted && (
-              <Alert className="border-red-500 bg-red-500/10">
-                <XCircle className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-red-400">
-                  Maximale Anzahl Versuche erreicht. Das Rätsel ist gescheitert.
-                </AlertDescription>
-              </Alert>
-            )}
           </CardContent>
         </Card>
       </motion.div>

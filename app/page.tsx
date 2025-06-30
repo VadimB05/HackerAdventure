@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OptionsModal } from '@/components/ui/options-modal';
@@ -23,6 +23,33 @@ export default function HomePage() {
   const [showOptions, setShowOptions] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
+  const [localHasGameProgress, setLocalHasGameProgress] = useState(false);
+
+  // Manueller Check für Spielstand
+  useEffect(() => {
+    if (user && !isLoading) {
+      const checkGameProgress = async () => {
+        try {
+          const response = await fetch('/api/game/state', {
+            method: 'GET',
+            credentials: 'include'
+          });
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Local game progress check:', data.hasGameProgress);
+            setLocalHasGameProgress(data.hasGameProgress);
+          }
+        } catch (error) {
+          console.error('Local game progress check failed:', error);
+        }
+      };
+      
+      checkGameProgress();
+    }
+  }, [user, isLoading]);
+
+  // Verwende den lokalen State, wenn der Context-State nicht funktioniert
+  const shouldShowContinueButton = hasGameProgress || localHasGameProgress;
 
   const handleStartNewGame = async () => {
     setIsStartingNew(true);
@@ -38,7 +65,38 @@ export default function HomePage() {
   const handleContinueGame = async () => {
     setIsContinuing(true);
     try {
-      await continueGame();
+      // Hole die aktuellen Spielstandsdaten direkt von der API
+      const response = await fetch('/api/game/state', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Loading game with data:', data);
+        
+        if (data.hasGameProgress && data.gameState) {
+          // Spielstandsdaten als URL-Parameter übergeben
+          const params = new URLSearchParams({
+            continue: 'true',
+            room: data.gameState.currentRoom,
+            bitcoins: data.gameState.bitcoins.toString(),
+            exp: data.gameState.experiencePoints.toString(),
+            level: data.gameState.level.toString()
+          });
+          
+          if (data.gameState.currentMission) {
+            params.append('mission', data.gameState.currentMission);
+          }
+          
+          // Zur Game-Seite weiterleiten
+          window.location.href = `/game?${params.toString()}`;
+        } else {
+          console.error('No game progress found');
+        }
+      } else {
+        console.error('Failed to load game state');
+      }
     } catch (error) {
       console.error('Fehler beim Fortsetzen des Spiels:', error);
     } finally {
@@ -127,7 +185,7 @@ export default function HomePage() {
               )}
 
               {/* Fortsetzen - nur für angemeldete Benutzer mit Spielstand */}
-              {user && hasGameProgress && (
+              {user && shouldShowContinueButton && (
                 <Button
                   onClick={handleContinueGame}
                   disabled={isContinuing}

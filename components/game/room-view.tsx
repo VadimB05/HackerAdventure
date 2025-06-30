@@ -13,6 +13,7 @@ import InventoryBar from './inventory-bar';
 import DragDropFeedback from './drag-drop-feedback';
 import { pickItem, getRoomItems, useItem, type InventoryItem } from '@/lib/services/inventory-service';
 import { changeRoom, getGameProgress } from '@/lib/services/progress-service';
+import GuidedMissionModal from './GuidedMissionModal';
 
 interface InteractiveObject {
   id: string;
@@ -95,6 +96,10 @@ export default function RoomView({
   // Feedback Timer Ref
   const feedbackTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  // Mission Modal State
+  const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
+  const [missionCompleted, setMissionCompleted] = useState(false);
+
   // Cleanup Timer beim Unmount
   React.useEffect(() => {
     return () => {
@@ -104,11 +109,12 @@ export default function RoomView({
     };
   }, []);
 
-  // Raum-Items beim Laden abrufen
+  // Raum laden
   useEffect(() => {
     loadRoomItems();
     loadGameProgress();
     loadAvailableExits();
+    checkMissionProgress(); // Mission-Progress beim Laden prüfen
   }, [roomId]);
 
   const loadRoomItems = async () => {
@@ -520,8 +526,22 @@ export default function RoomView({
     // Verbinde mit den vorhandenen Komponenten
     switch (object.id) {
       case 'computer':
-        console.log('Opening computer popup');
-        setIsComputerPopupOpen(true);
+        if (missionCompleted) {
+          // Mission ist abgeschlossen - zeige "Hier ist gerade nichts zu tun" am Computer
+          const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
+          const position = rect ? {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          } : { x: 50, y: 50 };
+          
+          showFeedbackWithTimer({
+            isValid: true,
+            message: 'Hier ist gerade nichts zu tun',
+            position: position
+          });
+        } else {
+          setIsMissionModalOpen(true);
+        }
         break;
       case 'smartphone':
         console.log('Opening smartphone overlay');
@@ -600,6 +620,38 @@ export default function RoomView({
         displayUnlockNotification(exit.unlockMessage);
       }
     });
+  };
+
+  // Mission-Progress prüfen
+  const checkMissionProgress = async () => {
+    try {
+      const response = await fetch('/api/game/progress/mission', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          roomId: roomId
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success && data.isCompleted) {
+        setMissionCompleted(true);
+      }
+    } catch (error) {
+      console.error('Fehler beim Prüfen des Mission-Progress:', error);
+    }
+  };
+
+  // Mission-Progress nach dem Schließen des Mission-UI prüfen
+  const handleMissionModalClose = async () => {
+    setIsMissionModalOpen(false);
+    // Kurze Verzögerung, dann Mission-Progress prüfen
+    setTimeout(() => {
+      checkMissionProgress();
+    }, 500);
   };
 
   return (
@@ -886,32 +938,6 @@ export default function RoomView({
         )}
       </AnimatePresence>
 
-      {/* Computer-Auswahl-Popup */}
-      <ChoicePopup
-        isOpen={isComputerPopupOpen}
-        title="Computer öffnen"
-        description="Was möchtest du öffnen?"
-        options={[
-          {
-            id: 'terminal',
-            label: 'Terminal',
-            description: 'Hacking, Programmierung, Missionen',
-            icon: <Monitor className="h-5 w-5" />
-          },
-          {
-            id: 'darkroom',
-            label: 'DarkChat',
-            description: 'Darknet-Kommunikation',
-            icon: <MessageSquare className="h-5 w-5" />
-          }
-        ]}
-        onSelect={(optionId) => {
-          setIsComputerPopupOpen(false);
-          console.log('Computer-Option ausgewählt:', optionId);
-        }}
-        onCancel={() => setIsComputerPopupOpen(false)}
-      />
-
       {/* Tür-Auswahl-Popup */}
       <ChoicePopup
         isOpen={isDoorPopupOpen}
@@ -995,6 +1021,14 @@ export default function RoomView({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mission Modal */}
+      <GuidedMissionModal
+        missionId="mission1_crypto_bank"
+        isOpen={isMissionModalOpen}
+        onClose={handleMissionModalClose}
+        onMissionComplete={checkMissionProgress}
+      />
     </div>
   );
 } 

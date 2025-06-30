@@ -16,28 +16,39 @@ import {
   Trophy,
   ChevronRight
 } from 'lucide-react';
+import { useGameState } from './game-context';
+import { PuzzleData } from '@/lib/services/puzzle-service';
 
 interface TerminalCommand {
+  type: 'user' | 'system';
   command: string;
-  output: string;
   timestamp: Date;
 }
 
 interface PuzzleTerminalProps {
   puzzleId: string;
+  puzzleData?: PuzzleData;
   onSolve: (puzzleId: string, isCorrect: boolean) => void;
   onClose: () => void;
 }
 
 export default function PuzzleTerminal({
   puzzleId,
+  puzzleData,
   onSolve,
   onClose
 }: PuzzleTerminalProps) {
+  // Game-Context für Alarm-Level
+  const { increaseAlarmLevel, alarmLevel } = useGameState();
+  
   // Puzzle-Daten
-  const [puzzleData, setPuzzleData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const [maxAttempts, setMaxAttempts] = useState(5);
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [lastAlarmLevel, setLastAlarmLevel] = useState(0);
   
   // Terminal-State
   const [currentCommand, setCurrentCommand] = useState('');
@@ -46,7 +57,6 @@ export default function PuzzleTerminal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Spiel-State
-  const [attempts, setAttempts] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
   const [showResult, setShowResult] = useState(false);
@@ -54,7 +64,6 @@ export default function PuzzleTerminal({
   const [showTrophy, setShowTrophy] = useState(false);
   
   // Timer für Zeitlimit
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Terminal-Referenz für Auto-Scroll
@@ -95,212 +104,290 @@ export default function PuzzleTerminal({
     }
   }, [isLoading, error, showTrophy]);
 
+  // Focus auf Input nach dem Leeren (für Terminal-Verhalten)
+  useEffect(() => {
+    if (inputRef.current && currentCommand === '' && !isSubmitting) {
+      // Kurze Verzögerung, damit der Benutzer die Ausgabe sehen kann
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [currentCommand, isSubmitting]);
+
+  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
+  useEffect(() => {
+    if (alarmLevel > lastAlarmLevel) {
+      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
+      setLastAlarmLevel(alarmLevel);
+      
+      // Versuche zurücksetzen
+      resetPuzzleAttempts();
+      
+      // Rätsel NICHT schließen - nur Versuche zurücksetzen
+      // Das Rätsel soll weiter spielbar bleiben
+    }
+  }, [alarmLevel, lastAlarmLevel]);
+
+  // Versuche in der Datenbank zurücksetzen
+  const resetPuzzleAttempts = async () => {
+    try {
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          reason: 'Alarm-Level erhöht - Versuche zurückgesetzt'
+        }),
+      });
+
+      if (response.ok) {
+        console.log('Versuche erfolgreich zurückgesetzt');
+        // Versuche sofort auf 0 setzen
+        setAttempts(0);
+        
+        // Kurze Nachricht anzeigen
+        addCommandToHistory('system', 'Versuche wurden zurückgesetzt. Du kannst es erneut versuchen!');
+      } else {
+        console.log('Fehler beim Zurücksetzen der Versuche');
+      }
+    } catch (error) {
+      console.error('Fehler beim Zurücksetzen der Versuche:', error);
+    }
+  };
+
   // Puzzle laden
   const loadPuzzle = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Versuche zuerst die Debug-API
-      const result = await fetch(`/api/debug/puzzles/${puzzleId}`);
-      const data = await result.json();
-
-      if (result.ok && data.success) {
-        // Debug-API Format zu Terminal-Format konvertieren
-        const puzzle = data.puzzle;
-        setPuzzleData({
-          id: puzzle.puzzleId || puzzle.id,
-          name: puzzle.name,
-          description: puzzle.description,
-          difficulty: puzzle.difficulty,
-          maxAttempts: puzzle.maxAttempts,
-          timeLimitSeconds: puzzle.timeLimitSeconds,
-          rewardExp: puzzle.rewardExp,
-          rewardBitcoins: puzzle.rewardMoney || 0.0001,
-          hints: puzzle.hints || [],
-          solution: puzzle.solution || '',
-          progress: {
-            attempts: 0,
-            hintsUsed: 0,
-            isCompleted: false
-          }
-        });
-        setAttempts(0);
+      // Wenn puzzleData als Prop vorhanden ist, verwende diese
+      if (puzzleData) {
+        console.log('Verwende puzzleData aus Props:', puzzleData);
+        
+        // Versuche aus der API-Response laden
+        const attemptsFromApi = puzzleData.progress?.attempts || 0;
+        console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
+        setAttempts(attemptsFromApi);
+        setMaxAttempts(puzzleData.maxAttempts);
         
         // Timer starten wenn Zeitlimit vorhanden
-        if (puzzle.timeLimitSeconds) {
-          setTimeRemaining(puzzle.timeLimitSeconds);
+        if (puzzleData.timeLimitSeconds && puzzleData.timeLimitSeconds > 0) {
+          setTimeLimit(puzzleData.timeLimitSeconds);
+          setTimeRemaining(puzzleData.timeLimitSeconds);
+          startTimer();
         }
         
         // Willkommensnachricht hinzufügen
-        addCommandToHistory('system', `Willkommen im Terminal-Rätsel: ${puzzle.name}\n${puzzle.description}\n\nVerfügbare Befehle: help, hint, clear, status`);
-      } else {
-        // Fallback zu Mock-Daten
-        setPuzzleData({
-          id: puzzleId,
-          name: 'Terminal-Rätsel',
-          description: 'Löse das Terminal-Rätsel mit den richtigen Befehlen',
-          difficulty: 2,
-          maxAttempts: 3,
-          timeLimitSeconds: 300,
-          rewardExp: 100,
-          rewardBitcoins: 0.0003,
-          hints: ['Tipp 1: Versuche "help"', 'Tipp 2: Schaue dir die Ausgaben genau an'],
-          solution: 'ls',
-          progress: {
-            attempts: 0,
-            hintsUsed: 0,
-            isCompleted: false
-          }
-        });
-        setAttempts(0);
-        setTimeRemaining(300);
+        addCommandToHistory('system', `Willkommen im Terminal-Rätsel: ${puzzleData.name}\n${puzzleData.description}\n\nVerfügbare Befehle: help, hint, clear, status`);
         
-        addCommandToHistory('system', `Willkommen im Terminal-Rätsel (Demo-Modus)\nLöse das Terminal-Rätsel mit den richtigen Befehlen\n\nVerfügbare Befehle: help, hint, clear, status`);
+        setIsLoading(false);
+        return;
       }
+
+      // Fallback: Lade Puzzle von API
+      const response = await fetch(`/api/game/puzzles/${puzzleId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Laden des Rätsels');
+      }
+
+      if (!data.success || !data.puzzle) {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+
+      const puzzle = data.puzzle;
+      console.log('Geladenes Puzzle:', puzzle);
+      
+      // Versuche aus der API-Response laden
+      const attemptsFromApi = puzzle.progress?.attempts || 0;
+      console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzle.maxAttempts}`);
+      setAttempts(attemptsFromApi);
+      setMaxAttempts(puzzle.maxAttempts);
+      
+      // Timer starten wenn Zeitlimit vorhanden
+      if (puzzle.timeLimitSeconds && puzzle.timeLimitSeconds > 0) {
+        setTimeLimit(puzzle.timeLimitSeconds);
+        setTimeRemaining(puzzle.timeLimitSeconds);
+        startTimer();
+      }
+      
+      // Willkommensnachricht hinzufügen
+      addCommandToHistory('system', `Willkommen im Terminal-Rätsel: ${puzzle.name}\n${puzzle.description}\n\nVerfügbare Befehle: help, hint, clear, status`);
+
     } catch (error) {
       console.error('Fehler beim Laden des Rätsels:', error);
-      // Fallback zu Mock-Daten bei Fehler
-      setPuzzleData({
-        id: puzzleId,
-        name: 'Terminal-Rätsel',
-        description: 'Löse das Terminal-Rätsel mit den richtigen Befehlen',
-        difficulty: 2,
-        maxAttempts: 3,
-        timeLimitSeconds: 300,
-        rewardExp: 100,
-        rewardBitcoins: 0.0003,
-        hints: ['Tipp 1: Versuche "help"', 'Tipp 2: Schaue dir die Ausgaben genau an'],
-        solution: 'ls',
-        progress: {
-          attempts: 0,
-          hintsUsed: 0,
-          isCompleted: false
-        }
-      });
-      setAttempts(0);
-      setTimeRemaining(300);
-      
-      addCommandToHistory('system', `Willkommen im Terminal-Rätsel (Demo-Modus)\nLöse das Terminal-Rätsel mit den richtigen Befehlen\n\nVerfügbare Befehle: help, hint, clear, status`);
+      setError(error instanceof Error ? error.message : 'Unbekannter Fehler');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    if (puzzleData) {
+      // Versuche aus der API-Response laden
+      const attemptsFromApi = puzzleData.progress?.attempts || 0;
+      console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
+      setAttempts(attemptsFromApi);
+      setMaxAttempts(puzzleData.maxAttempts);
+    }
+  }, [puzzleData]);
+
+  // Lade Puzzle-Daten beim ersten Laden
+  useEffect(() => {
     loadPuzzle();
   }, [puzzleId]);
 
-  const addCommandToHistory = (command: string, output: string) => {
+  // Reset alle States beim Öffnen des Rätsels
+  useEffect(() => {
+    if (puzzleId) {
+      console.log('[DEBUG] Rätsel geöffnet - setze alle States zurück');
+      setCommandHistory([]);
+      setCurrentCommand('');
+      setShowHint(false);
+      setCurrentHintIndex(0);
+    }
+  }, [puzzleId]);
+
+  const addCommandToHistory = (type: 'user' | 'system', command: string) => {
     const newCommand: TerminalCommand = {
+      type,
       command,
-      output,
       timestamp: new Date()
     };
     setCommandHistory(prev => [...prev, newCommand]);
   };
 
-  const handleCommandSubmit = async () => {
-    if (!currentCommand.trim() || isSubmitting) return;
+  const handleSubmit = async (command: string) => {
+    if (!command.trim()) return;
 
-    const command = currentCommand.trim().toLowerCase();
+    // Befehl zur Historie hinzufügen
+    addCommandToHistory('user', command);
+    
+    // Input-Feld leeren (wie in einem echten Terminal)
     setCurrentCommand('');
     setHistoryIndex(-1);
 
     // Spezielle Befehle behandeln
-    if (command === 'help') {
-      addCommandToHistory(command, 
-        'Verfügbare Befehle:\n' +
-        '  help     - Zeigt diese Hilfe an\n' +
-        '  hint     - Zeigt einen Hinweis an\n' +
-        '  clear    - Löscht die Terminal-Ausgabe\n' +
-        '  status   - Zeigt den aktuellen Status\n' +
-        '  [andere] - Versucht das Rätsel zu lösen'
-      );
+    if (command.toLowerCase() === 'help') {
+      addCommandToHistory('system', 'Verfügbare Befehle:\n- hint: Zeige einen Hinweis\n- clear: Lösche Terminal\n- status: Zeige aktuellen Status\n- [dein Befehl]: Führe Befehl aus');
       return;
     }
 
-    if (command === 'clear') {
+    if (command.toLowerCase() === 'clear') {
       setCommandHistory([]);
       return;
     }
 
-    if (command === 'status') {
-      addCommandToHistory(command, 
-        `Status:\n` +
-        `  Versuche: ${attempts}/${puzzleData?.maxAttempts || 0}\n` +
-        `  Zeit: ${timeRemaining !== null ? `${Math.floor(timeRemaining / 60)}:${(timeRemaining % 60).toString().padStart(2, '0')}` : 'Unbegrenzt'}\n` +
-        `  Hinweise: ${currentHintIndex}/${puzzleData?.hints?.length || 0}`
-      );
+    if (command.toLowerCase() === 'status') {
+      addCommandToHistory('system', `Status:\n- Versuche: ${attempts}/${maxAttempts}\n- Zeit: ${timeRemaining || 'Unbegrenzt'}\n- Hinweise verfügbar: ${puzzleData?.hints?.length || 0}`);
       return;
     }
 
-    if (command === 'hint') {
-      handleHint();
+    if (command.toLowerCase() === 'hint') {
+      if (puzzleData?.hints && puzzleData.hints.length > 0) {
+        const hint = puzzleData.hints[currentHintIndex % puzzleData.hints.length];
+        addCommandToHistory('system', `Hinweis: ${hint}`);
+        setCurrentHintIndex(prev => prev + 1);
+        
+        // Hinweis nach 5 Sekunden ausblenden
+        setTimeout(() => {
+          setShowHint(false);
+        }, 5000);
+      } else {
+        addCommandToHistory('system', 'Keine Hinweise verfügbar.');
+      }
       return;
     }
 
-    // Rätsel-Lösung versuchen
-    setIsSubmitting(true);
+    // Prüfe ob maximale Versuche erreicht sind
+    if (attempts >= maxAttempts) {
+      addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Alarm-Level wird erhöht!');
+      increaseAlarmLevel('Maximale Versuche im Terminal-Rätsel erreicht');
+      return;
+    }
 
     try {
-      const response = await fetch('/api/debug/puzzles/solve', {
+      setIsSubmitting(true);
+
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/solve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
-          puzzleId,
-          questionId: '1', // Terminal-Rätsel haben nur eine "Frage"
           answer: command,
-          timeSpent: puzzleData?.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : undefined
+          timeSpent: timeLimit ? timeLimit - (timeRemaining || 0) : 0
         }),
       });
 
-      const result = await response.json();
+      const data = await response.json();
 
-      if (result.success) {
-        setIsCorrect(result.isCorrect);
-        setAttempts(result.attempts);
-        
-        if (result.isCorrect) {
-          addCommandToHistory(command, '✅ Korrekt! Rätsel gelöst!');
-          setShowResult(true);
-          setTimeout(() => {
-            setShowResult(false);
-            setShowTrophy(true);
-          }, 2000);
+      if (response.ok && data.success) {
+        // Versuche aktualisieren
+        setAttempts(data.attempts);
+
+        if (data.isCorrect) {
+          addCommandToHistory('system', `${data.message}\nRätsel gelöst!`);
+          
+          // Mission-Progress prüfen nach erfolgreichem Lösen
+          try {
+            const missionResponse = await fetch('/api/game/progress/mission', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                roomId: puzzleData?.roomId || 'basement'
+              }),
+            });
+
+            const missionData = await missionResponse.json();
+            console.log(`[DEBUG] Mission Progress Response:`, missionData);
+
+            if (missionData.success && missionData.isCompleted) {
+              console.log(`[DEBUG] Mission abgeschlossen! Belohnungen:`, missionData.rewards);
+              addCommandToHistory('system', `Mission abgeschlossen! Belohnung: ${missionData.rewards.bitcoins} BTC, ${missionData.rewards.exp} XP`);
+            }
+          } catch (missionError) {
+            console.error('Fehler beim Prüfen des Mission-Progress:', missionError);
+          }
+          
+          onSolve(puzzleId, true);
         } else {
-          addCommandToHistory(command, '❌ Falsch. Versuche einen anderen Befehl.');
-          setShowResult(true);
-          setTimeout(() => {
-            setShowResult(false);
-          }, 3000);
+          addCommandToHistory('system', `${data.message}\nVersuche: ${data.attempts}/${data.maxAttempts}`);
+          
+          // Prüfe ob maximale Versuche erreicht sind
+          if (data.maxAttemptsReached) {
+            addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Alarm-Level wird erhöht!');
+            increaseAlarmLevel('Maximale Versuche im Terminal-Rätsel erreicht');
+          }
         }
       } else {
-        addCommandToHistory(command, `❌ Fehler: ${result.error || 'Unbekannter Fehler'}`);
+        // Prüfe ob es ein "Maximale Versuche" Fehler ist
+        if (data.error && data.error.includes('Maximale Anzahl Versuche')) {
+          addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Alarm-Level wird erhöht!');
+          increaseAlarmLevel('Maximale Versuche im Terminal-Rätsel erreicht');
+        } else {
+          addCommandToHistory('system', `Fehler: ${data.error || 'Unbekannter Fehler'}`);
+        }
       }
     } catch (error) {
-      console.error('Netzwerkfehler:', error);
-      addCommandToHistory(command, '❌ Netzwerkfehler beim Lösen des Rätsels');
+      console.error('Fehler beim Lösen des Rätsels:', error);
+      addCommandToHistory('system', 'Netzwerkfehler beim Lösen des Rätsels');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleHint = () => {
-    if (puzzleData && currentHintIndex < puzzleData.hints.length) {
-      const hint = puzzleData.hints[currentHintIndex];
-      addCommandToHistory('hint', `💡 Hinweis ${currentHintIndex + 1}: ${hint}`);
-      setCurrentHintIndex(prev => prev + 1);
-    } else {
-      addCommandToHistory('hint', '❌ Keine weiteren Hinweise verfügbar.');
-    }
-  };
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleCommandSubmit();
+      handleSubmit(currentCommand);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (historyIndex < commandHistory.length - 1) {
@@ -346,6 +433,22 @@ export default function PuzzleTerminal({
       case 4: return 'Schwer';
       case 5: return 'Sehr schwer';
       default: return 'Unbekannt';
+    }
+  };
+
+  const startTimer = () => {
+    if (timeLimit && timeLimit > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev === null || prev <= 1) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
   };
 
@@ -425,11 +528,11 @@ export default function PuzzleTerminal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-2xl mx-4"
+        className="w-full max-w-4xl mx-4"
       >
         <Card className="bg-black/90 border-green-500 text-green-400">
           <CardHeader>
@@ -550,15 +653,9 @@ export default function PuzzleTerminal({
                 <div className="bg-gray-900 border border-gray-600 rounded-lg p-4 font-mono text-sm h-48 overflow-y-auto" ref={terminalRef}>
                   <div className="space-y-2">
                     {commandHistory.map((cmd, index) => (
-                      <div key={index} className="space-y-1">
-                        {cmd.command !== 'system' && (
-                          <div className="flex items-center text-green-400">
-                            <span className="text-blue-400 mr-2">$</span>
-                            <span>{cmd.command}</span>
-                          </div>
-                        )}
-                        <div className="text-gray-300 whitespace-pre-wrap ml-4">
-                          {cmd.output}
+                      <div key={index} className="mb-2">
+                        <div className="text-green-400">
+                          {cmd.type === 'user' ? '$ ' : ''}{cmd.command}
                         </div>
                       </div>
                     ))}
@@ -579,7 +676,7 @@ export default function PuzzleTerminal({
                     disabled={isSubmitting}
                   />
                   <Button
-                    onClick={handleCommandSubmit}
+                    onClick={() => handleSubmit(currentCommand)}
                     disabled={!currentCommand.trim() || isSubmitting}
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
@@ -597,14 +694,12 @@ export default function PuzzleTerminal({
                   {/* Hinweis-Button */}
                   {puzzleData.hints?.length > 0 && currentHintIndex < puzzleData.hints.length && (
                     <Button
-                      onClick={handleHint}
+                      onClick={() => handleSubmit('hint')}
                       variant="outline"
                       size="sm"
-                      className="border-yellow-500 text-yellow-400 hover:bg-yellow-500/10"
-                      disabled={isSubmitting}
+                      className="ml-2"
                     >
-                      <Lightbulb className="h-4 w-4 mr-2" />
-                      Hinweis ({currentHintIndex + 1}/{puzzleData.hints.length})
+                      Hinweis
                     </Button>
                   )}
                 </div>

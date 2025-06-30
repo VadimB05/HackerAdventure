@@ -13,13 +13,14 @@ import HackingMission from "./hacking-mission"
 import TerminalMission from "./terminal-mission"
 import MoneyPopup from "./money-popup"
 import RoomView from "./room-view"
+import GameOverScreen from "./game-over-screen"
 import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getInventory, type InventoryItem } from "@/lib/services/inventory-service"
 
 export default function GameLayout() {
-  const { currentView, setCurrentView } = useGameState()
+  const { currentView, setCurrentView, bitcoinBalance } = useGameState()
   
   // Inventar-State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -29,6 +30,25 @@ export default function GameLayout() {
   useEffect(() => {
     loadInventory();
   }, []);
+
+  // Setze die richtige View basierend auf dem initialen Raum
+  useEffect(() => {
+    // Prüfe URL-Parameter für den initialen Raum
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialRoom = urlParams.get('room');
+    
+    if (initialRoom) {
+      switch (initialRoom) {
+        case "basement":
+          setCurrentView("basement");
+          break;
+        case "intro":
+        default:
+          setCurrentView("apartment");
+          break;
+      }
+    }
+  }, [setCurrentView]);
 
   const loadInventory = async () => {
     try {
@@ -113,6 +133,18 @@ export default function GameLayout() {
     }
   };
 
+  // Bestimme den aktuellen Raum basierend auf der View
+  const getCurrentRoomId = () => {
+    switch (currentView) {
+      case "apartment":
+        return "intro"; // Das Apartment ist immer der intro-Raum
+      case "basement":
+        return "basement";
+      default:
+        return "intro";
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-black text-green-500 font-mono">
       {/* Game header with navigation */}
@@ -182,7 +214,7 @@ export default function GameLayout() {
       <main className="flex-1 overflow-hidden">
         {currentView === "apartment" && (
           <RoomView 
-            roomId="intro" 
+            roomId={getCurrentRoomId()} 
             inventory={inventory}
             onItemUse={handleItemUse}
             onInventoryUpdate={handleInventoryUpdate}
@@ -197,6 +229,7 @@ export default function GameLayout() {
       <HackingMission />
       <TerminalMission />
       <MoneyPopup />
+      <GameOverScreen />
     </div>
   )
 }

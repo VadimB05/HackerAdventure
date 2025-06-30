@@ -85,6 +85,22 @@ export interface MissionStep {
   completed: boolean
 }
 
+// Neue Typen für Alarm-Level-System
+export interface AlarmLevelNotification {
+  id: string
+  level: number
+  message: string
+  timestamp: string
+  isFirstTime: boolean
+}
+
+// Neuer Typ für "Leben verloren"-Nachricht
+export interface LifeLostNotification {
+  id: string
+  message: string
+  timestamp: string
+}
+
 // Füge Entscheidungen zum GameContextType hinzu
 interface GameContextType {
   currentView: View
@@ -130,23 +146,49 @@ interface GameContextType {
   // Neue Missionen
   missions: Mission[]
   getMission: (id: string) => Mission | undefined
+  // Neue Alarm-Level-Funktionen
+  alarmLevel: number
+  increaseAlarmLevel: (reason: string) => void
+  resetAlarmLevel: () => void
+  alarmNotifications: AlarmLevelNotification[]
+  removeAlarmNotification: (id: string) => void
+  isGameOver: boolean
+  resetGame: () => void
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined)
 
-export function GameProvider({ children }: { children: ReactNode }) {
-  const [currentView, setCurrentView] = useState<View>("apartment")
+interface GameProviderProps {
+  children: ReactNode;
+  continueGame?: boolean;
+  initialRoom?: string;
+  initialBitcoins?: number;
+  initialExp?: number;
+  initialLevel?: number;
+  initialMission?: string | null;
+}
+
+export function GameProvider({ 
+  children, 
+  continueGame = false,
+  initialRoom = "intro",
+  initialBitcoins = 0,
+  initialExp = 0,
+  initialLevel = 1,
+  initialMission = null
+}: GameProviderProps) {
+  const [currentView, setCurrentView] = useState<View>(continueGame ? "apartment" : "apartment")
   const [day, setDay] = useState(1)
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("day")
   const [gameTime, setGameTime] = useState(480) // Start bei 8:00 Uhr (480 Minuten)
-  const [bitcoinBalance, setBitcoinBalance] = useState(0.25)
+  const [bitcoinBalance, setBitcoinBalance] = useState(continueGame ? initialBitcoins : 0)
   const [bitcoinRate, setBitcoinRate] = useState(59000) // Startpreis für 1 BTC in USD
   const [mentalState, setMentalState] = useState<MentalState>("normal")
   const [terminalHistory, setTerminalHistory] = useState<string[]>([])
   const [messages, setMessages] = useState<{ sender: string; content: string; timestamp: string }[]>([
     {
       sender: "DARKROOM",
-      content: "Welcome to INTRUSION, n0seC. Your first mission awaits. Check your terminal.",
+      content: continueGame ? "Welcome back, n0seC. Your progress has been loaded." : "Welcome to INTRUSION, n0seC. Your first mission awaits. Check your terminal.",
       timestamp: new Date().toISOString(),
     },
   ])
@@ -265,162 +307,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [currentChatGroup, setCurrentChatGroup] = useState<string>("crimenetwork")
 
   // Neue States für Missionen
-  const [currentMission, setCurrentMission] = useState<string | null>(null)
+  const [currentMission, setCurrentMission] = useState<string | null>(continueGame ? initialMission : null)
   const [completedMissions, setCompletedMissions] = useState<string[]>([])
 
   // Neue States für Geld-Benachrichtigungen
   const [moneyNotifications, setMoneyNotifications] = useState<MoneyNotification[]>([])
 
+  // Neue States für Alarm-Level-System
+  const [alarmLevel, setAlarmLevel] = useState(0)
+  const [alarmNotifications, setAlarmNotifications] = useState<AlarmLevelNotification[]>([])
+  const [isGameOver, setIsGameOver] = useState(false)
+  const [hasShownFirstAlarmExplanation, setHasShownFirstAlarmExplanation] = useState(false)
+
   // Missionen definieren
-  const [missions] = useState<Mission[]>([
-    {
-      id: "mission1",
-      title: "Datenextraktion: ISP-Datenbank",
-      description: "Extrahiere Kundendaten von Alexander Volkov aus der ISP-Datenbank.",
-      reward: 0.15,
-      type: "guided",
-      steps: [
-        {
-          id: "step1",
-          title: "Netzwerk scannen",
-          description: "Scanne das Zielnetzwerk nach offenen Ports und Diensten.",
-          command: "nmap -sV 192.168.1.100",
-          hint: "nmap ist ein Netzwerk-Scanner. Der Parameter -sV identifiziert Dienste und Versionen.",
-          completed: false,
-        },
-        {
-          id: "step2",
-          title: "SSH-Verbindung herstellen",
-          description: "Verbinde dich mit dem Server über SSH.",
-          command: "ssh -p 22 admin@192.168.1.100",
-          hint: "SSH (Secure Shell) ermöglicht sichere Verbindungen. -p gibt den Port an.",
-          completed: false,
-        },
-        {
-          id: "step3",
-          title: "Datenbank-Zugriff",
-          description: "Greife auf die MySQL-Datenbank zu.",
-          command: "mysql -u root -p customers",
-          hint: "MySQL ist ein Datenbanksystem. -u gibt den Benutzer an, -p fordert ein Passwort.",
-          completed: false,
-        },
-        {
-          id: "step4",
-          title: "Daten extrahieren",
-          description: "Extrahiere die Kundendaten von Alexander Volkov.",
-          command: "SELECT * FROM users WHERE name LIKE '%Volkov%';",
-          hint: "SQL-Befehle werden verwendet, um Daten abzufragen. % ist ein Platzhalter für beliebige Zeichen.",
-          completed: false,
-        },
-        {
-          id: "step5",
-          title: "Daten exportieren",
-          description: "Exportiere die gefundenen Daten in eine Datei.",
-          command: "mysqldump -u root -p customers users > volkov_data.sql",
-          hint: "mysqldump erstellt ein Backup von Datenbanken. > leitet die Ausgabe in eine Datei um.",
-          completed: false,
-        },
-      ],
-    },
-    {
-      id: "mission2",
-      title: "Passwort-Knacker: Bankzugang",
-      description: "Knacke das Passwort für ein Bankkonto und überweise Geld auf ein anonymes Konto.",
-      reward: 0.25,
-      type: "terminal",
-      commands: [
-        "hydra -l admin -P /usr/share/wordlists/rockyou.txt 192.168.1.200 -s 8080 http-post-form",
-        "ssh admin@192.168.1.200",
-        "cd /var/www/html/bank",
-        "cat config.php",
-        "mysql -u bankadmin -p'P@ssw0rd123!' bankdb",
-        "SELECT * FROM accounts WHERE balance > 10000;",
-        "UPDATE accounts SET balance = balance - 10000 WHERE account_id = 'ACT7391';",
-        "INSERT INTO transactions VALUES (NULL, 'ACT7391', 'ACT8842', 10000, NOW(), 'Transfer');",
-        "exit",
-      ],
-    },
-    {
-      id: "mission3",
-      title: "Überwachungssystem: Kamera-Hack",
-      description: "Hacke das Überwachungssystem eines Hochsicherheitsgebäudes und deaktiviere die Kameras.",
-      reward: 0.35,
-      type: "guided",
-      steps: [
-        {
-          id: "step1",
-          title: "Netzwerk identifizieren",
-          description: "Identifiziere das Netzwerk des Überwachungssystems.",
-          command: "nmap -sP 192.168.2.0/24",
-          hint: "Der Parameter -sP führt einen Ping-Scan durch, um aktive Hosts zu finden.",
-          completed: false,
-        },
-        {
-          id: "step2",
-          title: "Schwachstellen scannen",
-          description: "Scanne das Überwachungssystem nach Schwachstellen.",
-          command: "nmap -sV --script vuln 192.168.2.50",
-          hint: "Der Parameter --script vuln führt Skripte aus, die nach bekannten Schwachstellen suchen.",
-          completed: false,
-        },
-        {
-          id: "step3",
-          title: "Zugriff erlangen",
-          description: "Nutze die gefundene Schwachstelle, um Zugriff zu erlangen.",
-          command: "exploit -t 192.168.2.50 -v CVE-2023-1234",
-          hint: "Der exploit-Befehl nutzt bekannte Schwachstellen aus. -t gibt das Ziel an, -v die Schwachstelle.",
-          completed: false,
-        },
-        {
-          id: "step4",
-          title: "Kamerasystem finden",
-          description: "Finde das Kamerasystem im internen Netzwerk.",
-          command: "find / -name 'camera_control*'",
-          hint: "Der find-Befehl durchsucht das Dateisystem nach Dateien mit bestimmten Namen.",
-          completed: false,
-        },
-        {
-          id: "step5",
-          title: "Kameras deaktivieren",
-          description: "Deaktiviere die Überwachungskameras.",
-          command: "./camera_control --disable-all --no-log",
-          hint: "Der Parameter --no-log verhindert, dass die Aktion protokolliert wird.",
-          completed: false,
-        },
-        {
-          id: "step6",
-          title: "Spuren verwischen",
-          description: "Lösche alle Spuren deiner Anwesenheit.",
-          command: "shred -u /var/log/access.log",
-          hint: "Der shred-Befehl überschreibt Dateien mehrfach, bevor er sie löscht, um Datenwiederherstellung zu verhindern.",
-          completed: false,
-        },
-      ],
-    },
-    {
-      id: "mission4",
-      title: "Kryptowährung: Blockchain-Manipulation",
-      description: "Manipuliere eine Blockchain-Transaktion, um Gelder umzuleiten.",
-      reward: 0.5,
-      type: "terminal",
-      commands: [
-        "btc-tools --scan-mempool",
-        "btc-tools --analyze-tx 3a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p",
-        "btc-tools --clone-tx 3a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p",
-        "nano tx_clone.json",
-        "btc-tools --modify-tx tx_clone.json --output-address 1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
-        "btc-tools --sign-tx tx_clone.json --key private_key.pem",
-        "btc-tools --broadcast-tx tx_clone.json",
-        "btc-tools --verify-tx",
-        "shred -u tx_clone.json private_key.pem",
-        "exit",
-      ],
-    },
-  ])
+  const [missions, setMissions] = useState<Mission[]>([])
 
   // Funktion zum Abrufen einer Mission
   const getMission = (id: string) => {
-    return missions.find((mission) => mission.id === id)
+    return missions.find(mission => mission.id === id)
   }
 
   // Funktion zum Treffen einer Entscheidung
@@ -571,8 +475,29 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }
 
   // Funktion zum Aktualisieren des Bitcoin-Guthabens mit optionaler Benachrichtigung
-  const updateBitcoinBalance = (amount: number, message?: string) => {
-    setBitcoinBalance((prev) => prev + amount)
+  const updateBitcoinBalance = async (amount: number, message?: string) => {
+    const newBalance = bitcoinBalance + amount;
+    setBitcoinBalance(newBalance);
+
+    // Backend aktualisieren
+    try {
+      const response = await fetch('/api/game/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          bitcoins: newBalance
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Fehler beim Aktualisieren der Bitcoin-Balance im Backend');
+      }
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren der Bitcoin-Balance:', error);
+    }
 
     // Wenn ein positiver Betrag und eine Nachricht vorhanden sind, zeige eine Benachrichtigung
     if (amount > 0 && message) {
@@ -629,6 +554,59 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval)
   }, [])
 
+  // Bitcoin-Balance aus dem Backend laden
+  useEffect(() => {
+    const loadBitcoinBalance = async () => {
+      try {
+        const response = await fetch('/api/game/state', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.gameState) {
+            setBitcoinBalance(parseFloat(data.gameState.bitcoins) || 0);
+          }
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Bitcoin-Balance:', error);
+      }
+    };
+
+    loadBitcoinBalance();
+  }, []);
+
+  // Bitcoin-Balance regelmäßig aus dem Backend aktualisieren
+  useEffect(() => {
+    const updateBitcoinBalanceFromBackend = async () => {
+      try {
+        const response = await fetch('/api/game/state', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.gameState) {
+            const backendBalance = parseFloat(data.gameState.bitcoins) || 0;
+            // Nur aktualisieren, wenn sich der Wert geändert hat
+            if (Math.abs(backendBalance - bitcoinBalance) > 0.0001) {
+              setBitcoinBalance(backendBalance);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Fehler beim Aktualisieren der Bitcoin-Balance:', error);
+      }
+    };
+
+    // Alle 5 Sekunden aktualisieren
+    const interval = setInterval(updateBitcoinBalanceFromBackend, 5000);
+
+    return () => clearInterval(interval);
+  }, [bitcoinBalance]);
+
   const incrementDay = () => {
     setDay((prev) => prev + 1)
   }
@@ -665,6 +643,206 @@ export function GameProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('changeView', handleViewChange as EventListener);
     };
   }, []);
+
+  // Alarm-Level-Funktionen
+  const increaseAlarmLevel = async (reason: string) => {
+    const newLevel = alarmLevel + 1
+    setAlarmLevel(newLevel)
+    
+    // Benachrichtigung erstellen
+    const notification: AlarmLevelNotification = {
+      id: Date.now().toString(),
+      level: newLevel,
+      message: !hasShownFirstAlarmExplanation 
+        ? `Du hast ein Leben verloren! ${reason}` 
+        : `Deine Alarm-Stufe hat sich um 1 erhöht`,
+      timestamp: new Date().toISOString(),
+      isFirstTime: !hasShownFirstAlarmExplanation
+    }
+    
+    setAlarmNotifications(prev => [...prev, notification])
+    
+    // Erste Alarm-Level-Erklärung anzeigen (nur beim ersten Mal)
+    if (!hasShownFirstAlarmExplanation) {
+      setHasShownFirstAlarmExplanation(true)
+      showStory({
+        id: 'alarm_explanation',
+        title: '⚠️ ALARM LEVEL SYSTEM AKTIVIERT',
+        content: [
+          'Du hast deinen ersten Fehler gemacht! Das Alarm-Level-System ist jetzt aktiv.',
+          'Jeder Fehler erhöht das Alarm-Level. Bei Level 10 wirst du Erwischt und dein Spielstand wird gelöscht!',
+          'Sei vorsichtiger bei deinen nächsten Versuchen!'
+        ],
+        type: 'text'
+      })
+    }
+    
+    // Bei Alarm-Level 10: FBI kommt!
+    if (newLevel >= 10) {
+      setIsGameOver(true)
+      
+      // FBI-Sound abspielen (falls verfügbar)
+      try {
+        const audio = new Audio('/sounds/fbi_open_up.mp3')
+        audio.volume = 0.7
+        audio.play()
+      } catch (error) {
+        console.log('FBI-Sound konnte nicht abgespielt werden')
+      }
+      
+      // Spielstand-Löschung nach kurzer Verzögerung
+      setTimeout(() => {
+        resetGame()
+      }, 3000)
+    }
+
+    // Datenbank-Update über API (falls User eingeloggt ist)
+    try {
+      const mockUserId = 1
+      
+      const response = await fetch('/api/game/alarm-level', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: mockUserId,
+          reason: reason
+        }),
+      });
+
+      if (!response.ok) {
+        console.log('API-Update für Alarm-Level fehlgeschlagen')
+      }
+    } catch (error) {
+      console.log('API-Update für Alarm-Level fehlgeschlagen:', error)
+    }
+  }
+
+  const resetAlarmLevel = async () => {
+    setAlarmLevel(0)
+    setAlarmNotifications([])
+    
+    // Datenbank-Update über API (falls User eingeloggt ist)
+    try {
+      const mockUserId = 1
+      
+      const response = await fetch('/api/game/alarm-level', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: mockUserId
+        }),
+      });
+
+      if (!response.ok) {
+        console.log('API-Update für Alarm-Level-Reset fehlgeschlagen')
+      }
+    } catch (error) {
+      console.log('API-Update für Alarm-Level-Reset fehlgeschlagen:', error)
+    }
+  }
+
+  const removeAlarmNotification = (id: string) => {
+    setAlarmNotifications(prev => prev.filter(notification => notification.id !== id))
+  }
+
+  const resetGame = () => {
+    // Alle Spielstände zurücksetzen
+    setCurrentView("apartment")
+    setDay(1)
+    setTimeOfDay("day")
+    setGameTime(480)
+    setBitcoinBalance(0)
+    setBitcoinRate(59000)
+    setMentalState("normal")
+    setTerminalHistory([])
+    setMessages([
+      {
+        sender: "DARKROOM",
+        content: "Welcome to INTRUSION, n0seC. Your first mission awaits. Check your terminal.",
+        timestamp: new Date().toISOString(),
+      },
+    ])
+    setCurrentDecision(null)
+    setPlayerDecisions([])
+    setCurrentStory(null)
+    setCurrentChatGroup("crimenetwork")
+    setCurrentMission(null)
+    setCompletedMissions([])
+    setMoneyNotifications([])
+    setAlarmLevel(0)
+    setAlarmNotifications([])
+    setIsGameOver(false)
+    setHasShownFirstAlarmExplanation(false)
+    
+    // Chat-Gruppen zurücksetzen
+    setChatGroups([
+      {
+        id: "crimenetwork",
+        name: "CrimeNetwork",
+        isFavorite: true,
+        description: "Hauptkanal für illegale Aktivitäten und Aufträge",
+        messages: [
+          {
+            id: "1",
+            sender: "ShadowDealer",
+            content: "NEW SHIPMENT: Premium Cocaine, 99% pure. DM for prices.",
+            timestamp: new Date(Date.now() - 3600000).toISOString(),
+          },
+          {
+            id: "2",
+            sender: "H4ckM4st3r",
+            content: "Selling access to corporate networks. Starting at 0.05 BTC. Clean entry, no traces.",
+            timestamp: new Date(Date.now() - 2400000).toISOString(),
+          },
+          {
+            id: "3",
+            sender: "GhostProxy",
+            content: "VPN nodes available in 15 countries. Bulletproof hosting. 0.01 BTC/month.",
+            timestamp: new Date(Date.now() - 1200000).toISOString(),
+          },
+          {
+            id: "4",
+            sender: "CryptoKing",
+            content: "Money laundering service. 15% fee. No questions asked.",
+            timestamp: new Date(Date.now() - 600000).toISOString(),
+          },
+          {
+            id: "5",
+            sender: "ADMIN",
+            content: "Reminder: No feds, no scams. Violators will be permanently banned and doxxed.",
+            timestamp: new Date(Date.now() - 300000).toISOString(),
+            isSystem: true,
+          },
+        ],
+        unreadCount: 0,
+      },
+      {
+        id: "hackers",
+        name: "HackersUnited",
+        isFavorite: false,
+        description: "Community für ethische Hacker und Sicherheitsforscher",
+        messages: [
+          {
+            id: "1",
+            sender: "WhiteHat",
+            content: "New zero-day vulnerability found in OpenSSL. Reporting to maintainers.",
+            timestamp: new Date(Date.now() - 1800000).toISOString(),
+          },
+          {
+            id: "2",
+            sender: "BugHunter",
+            content: "Anyone interested in collaborating on a security research project?",
+            timestamp: new Date(Date.now() - 900000).toISOString(),
+          },
+        ],
+        unreadCount: 0,
+      },
+    ])
+  }
 
   // Füge Entscheidungsfunktionen zum value-Objekt hinzu
   const value = {
@@ -707,6 +885,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     testMoneyNotification: () => {
       addMoneyNotification(0.05, "Test notification")
     },
+    alarmLevel,
+    increaseAlarmLevel,
+    resetAlarmLevel,
+    alarmNotifications,
+    removeAlarmNotification,
+    isGameOver,
+    resetGame,
   }
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>

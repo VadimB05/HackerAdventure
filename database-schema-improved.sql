@@ -236,6 +236,9 @@ CREATE TABLE player_stats (
     play_time_minutes INT DEFAULT 0,
     total_attempts INT DEFAULT 0, -- Gesamte Versuche
     hints_used_total INT DEFAULT 0, -- Gesamte verwendete Hinweise
+    current_alarm_level INT DEFAULT 0, -- Aktuelles Alarm-Level (0-10)
+    max_alarm_level_reached INT DEFAULT 0, -- Höchstes erreichtes Alarm-Level
+    total_alarm_increases INT DEFAULT 0, -- Gesamte Alarm-Level-Erhöhungen
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -307,6 +310,23 @@ CREATE TABLE room_items (
     FOREIGN KEY (item_id) REFERENCES items(item_id) ON DELETE CASCADE,
     INDEX idx_room_id (room_id),
     INDEX idx_item_id (item_id)
+);
+
+-- Alarm-Level-Historie
+CREATE TABLE alarm_level_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    alarm_level INT NOT NULL, -- Neues Alarm-Level (1-10)
+    reason VARCHAR(255) NOT NULL, -- Grund für die Erhöhung
+    puzzle_id VARCHAR(100) NULL, -- Optional: Welches Rätsel
+    mission_id VARCHAR(100) NULL, -- Optional: Welche Mission
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (puzzle_id) REFERENCES puzzles(puzzle_id) ON DELETE SET NULL,
+    FOREIGN KEY (mission_id) REFERENCES missions(mission_id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_alarm_level (alarm_level),
+    INDEX idx_created_at (created_at)
 );
 
 -- Standard-Daten einfügen

@@ -1,25 +1,135 @@
--- Fortschritt-Tabellen für das Spielfortschritt-System
+-- Progress-Tabellen Setup Script
+-- Führt die notwendigen Tabellen für das Progress-System ein
 
 USE intrusion_game;
 
--- Mission-Fortschritt-Tabelle (falls nicht vorhanden)
+-- Test-User erstellen (falls nicht vorhanden)
+INSERT IGNORE INTO users (id, username, password_hash, email, is_admin) VALUES
+(1, 'testuser', '$2b$10$test', 'test@example.com', FALSE);
+
+-- Game-States Tabelle erstellen (falls nicht vorhanden)
+CREATE TABLE IF NOT EXISTS game_states (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    current_room VARCHAR(100) NOT NULL DEFAULT 'intro',
+    current_mission VARCHAR(100) NULL,
+    inventory JSON DEFAULT '[]',
+    progress JSON DEFAULT '{}',
+    bitcoins DECIMAL(10,8) DEFAULT 0.25000000,
+    experience_points INT DEFAULT 0,
+    level INT DEFAULT 1,
+    health INT DEFAULT 100,
+    energy INT DEFAULT 100,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_current_room (current_room),
+    INDEX idx_current_mission (current_mission)
+);
+
+-- Puzzle-Progress Tabelle erstellen (falls nicht vorhanden)
+CREATE TABLE IF NOT EXISTS puzzle_progress (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    puzzle_id VARCHAR(100) NOT NULL,
+    is_completed BOOLEAN DEFAULT FALSE,
+    attempts INT DEFAULT 0,
+    best_time_seconds INT NULL,
+    completed_at TIMESTAMP NULL,
+    hints_used INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_user_puzzle (user_id, puzzle_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_puzzle_id (puzzle_id),
+    INDEX idx_is_completed (is_completed)
+);
+
+-- Mission-Progress Tabelle erstellen (falls nicht vorhanden)
 CREATE TABLE IF NOT EXISTS mission_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     mission_id VARCHAR(100) NOT NULL,
     is_completed BOOLEAN DEFAULT FALSE,
     completed_at TIMESTAMP NULL,
-    puzzles_completed JSON DEFAULT '[]', -- IDs der gelösten Rätsel
-    rooms_visited JSON DEFAULT '[]', -- IDs der besuchten Räume
+    puzzles_completed INT DEFAULT 0,
+    rooms_visited INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (mission_id) REFERENCES missions(mission_id) ON DELETE CASCADE,
     UNIQUE KEY unique_user_mission (user_id, mission_id),
     INDEX idx_user_id (user_id),
     INDEX idx_mission_id (mission_id),
     INDEX idx_is_completed (is_completed)
 );
+
+-- Player-Inventory Tabelle erstellen (falls nicht vorhanden)
+CREATE TABLE IF NOT EXISTS player_inventory (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    item_id VARCHAR(100) NOT NULL,
+    quantity INT DEFAULT 1,
+    durability INT NULL,
+    acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_user_item (user_id, item_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_item_id (item_id)
+);
+
+-- Test-Game-State erstellen (falls nicht vorhanden)
+INSERT IGNORE INTO game_states (user_id, current_room, current_mission, bitcoins, experience_points, level) VALUES
+(1, 'intro', NULL, 0.25000000, 0, 1);
+
+-- Test-Puzzle-Progress (falls nicht vorhanden)
+INSERT IGNORE INTO puzzle_progress (user_id, puzzle_id, is_completed, attempts, hints_used) VALUES
+(1, 'puzzle1', FALSE, 0, 0),
+(1, 'puzzle2', FALSE, 0, 0),
+(1, 'puzzle3', FALSE, 0, 0);
+
+-- Test-Mission-Progress (falls nicht vorhanden)
+INSERT IGNORE INTO mission_progress (user_id, mission_id, is_completed, puzzles_completed, rooms_visited) VALUES
+(1, 'mission1_crypto_bank', FALSE, 0, 0);
+
+-- Test-Inventory (falls nicht vorhanden)
+INSERT IGNORE INTO player_inventory (user_id, item_id, quantity) VALUES
+(1, 'laptop', 1),
+(1, 'usb_stick', 2);
+
+-- Überprüfung der Daten
+SELECT 
+    'Users' as table_name,
+    COUNT(*) as count
+FROM users
+UNION ALL
+SELECT 
+    'Game States' as table_name,
+    COUNT(*) as count
+FROM game_states
+UNION ALL
+SELECT 
+    'Puzzle Progress' as table_name,
+    COUNT(*) as count
+FROM puzzle_progress
+UNION ALL
+SELECT 
+    'Mission Progress' as table_name,
+    COUNT(*) as count
+FROM mission_progress
+UNION ALL
+SELECT 
+    'Player Inventory' as table_name,
+    COUNT(*) as count
+FROM player_inventory;
+
+-- Zeige Game-State für User 1
+SELECT 
+    user_id,
+    current_room,
+    current_mission,
+    bitcoins,
+    experience_points,
+    level
+FROM game_states 
+WHERE user_id = 1;
 
 -- Raum-Besuche-Tabelle für Tracking
 CREATE TABLE IF NOT EXISTS room_visits (

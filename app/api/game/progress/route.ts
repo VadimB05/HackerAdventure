@@ -9,6 +9,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const requestedUserId = searchParams.get('userId');
 
+    console.log(`Progress-API aufgerufen für User: ${userId}`);
+
+    // Prüfen ob User existiert
+    const userExists = await executeQuerySingle<{ id: number }>(
+      'SELECT id FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (!userExists) {
+      console.log(`User ${userId} nicht gefunden`);
+      return NextResponse.json(
+        { success: false, error: `User ${userId} nicht gefunden` },
+        { status: 404 }
+      );
+    }
+
     // Spieler-Status abrufen
     const gameState = await executeQuerySingle<{
       current_room: string;
@@ -23,10 +39,49 @@ export async function GET(request: NextRequest) {
     );
 
     if (!gameState) {
-      return NextResponse.json(
-        { success: false, error: 'Spieler-Status nicht gefunden' },
-        { status: 404 }
+      console.log(`Game-State für User ${userId} nicht gefunden - erstelle Standard-Werte`);
+      
+      // Standard-Game-State erstellen
+      await executeQuery(
+        'INSERT INTO game_states (user_id, current_room, bitcoins, experience_points, level) VALUES (?, ?, ?, ?, ?)',
+        [userId, 'intro', 0.25, 0, 1]
       );
+
+      // Standard-Game-State nochmal abrufen
+      const newGameState = await executeQuerySingle<{
+        current_room: string;
+        current_mission: string | null;
+        bitcoins: number;
+        experience_points: number;
+        level: number;
+        inventory: string;
+      }>(
+        'SELECT current_room, current_mission, bitcoins, experience_points, level, inventory FROM game_states WHERE user_id = ?',
+        [userId]
+      );
+
+      if (!newGameState) {
+        return NextResponse.json(
+          { success: false, error: 'Konnte Game-State nicht erstellen' },
+          { status: 500 }
+        );
+      }
+
+      // Standard-Response mit neuem Game-State
+      return NextResponse.json({
+        success: true,
+        progress: {
+          userId,
+          currentRoom: newGameState.current_room,
+          currentMission: newGameState.current_mission,
+          bitcoins: parseFloat(newGameState.bitcoins.toString()),
+          experiencePoints: newGameState.experience_points,
+          level: newGameState.level,
+          puzzleProgress: [],
+          missionProgress: [],
+          inventory: []
+        }
+      });
     }
 
     // Rätsel-Fortschritt abrufen
@@ -64,6 +119,8 @@ export async function GET(request: NextRequest) {
     // Inventar-Array erstellen
     const inventoryArray = inventory.map(item => item.item_id);
 
+    console.log(`Progress erfolgreich abgerufen für User ${userId}`);
+
     return NextResponse.json({
       success: true,
       progress: {
@@ -95,7 +152,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Fehler beim Abrufen des Spieler-Fortschritts:', error);
     return NextResponse.json(
-      { success: false, error: 'Interner Server-Fehler' },
+      { success: false, error: `Interner Server-Fehler: ${error}` },
       { status: 500 }
     );
   }
