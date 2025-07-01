@@ -83,11 +83,24 @@ const config: Config = {
   				to: {
   					height: '0'
   				}
+  			},
+  			  			'red-blink': {
+  				'0%, 100%': {
+  					backgroundColor: 'transparent',
+  					borderColor: 'rgb(34 197 94)',
+  					borderRadius: '20px'
+  				},
+  				'50%': {
+  					backgroundColor: 'rgba(239, 68, 68, 0.3)',
+  					borderColor: 'rgb(239, 68, 68)',
+  					borderRadius: '20px'
+  				}
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'red-blink': 'red-blink 0.5s ease-in-out 2'
   		}
   	}
   },

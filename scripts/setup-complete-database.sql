@@ -27,6 +27,21 @@ CREATE TABLE IF NOT EXISTS users (
     INDEX idx_is_active (is_active)
 );
 
+-- Städte-Tabelle (NEU)
+CREATE TABLE IF NOT EXISTS cities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    city_id VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    is_available BOOLEAN DEFAULT TRUE,
+    required_level INT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_city_id (city_id),
+    INDEX idx_is_available (is_available),
+    INDEX idx_required_level (required_level)
+);
+
 -- Missionen-Tabelle
 CREATE TABLE IF NOT EXISTS missions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,11 +60,32 @@ CREATE TABLE IF NOT EXISTS missions (
     INDEX idx_required_level (required_level)
 );
 
--- Räume-Tabelle
+-- Stadt-Mission-Zuordnung (NEU)
+CREATE TABLE IF NOT EXISTS city_missions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    city_id VARCHAR(100) NOT NULL,
+    mission_id VARCHAR(100) NOT NULL,
+    building_number INT NOT NULL,  -- 1-5 für die 5 Gebäude
+    building_name VARCHAR(255) NOT NULL,
+    building_description TEXT,
+    is_required BOOLEAN DEFAULT TRUE,  -- Muss abgeschlossen werden für city2
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (city_id) REFERENCES cities(city_id) ON DELETE CASCADE,
+    FOREIGN KEY (mission_id) REFERENCES missions(mission_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_city_mission (city_id, mission_id),
+    UNIQUE KEY unique_city_building (city_id, building_number),
+    INDEX idx_city_id (city_id),
+    INDEX idx_mission_id (mission_id),
+    INDEX idx_building_number (building_number)
+);
+
+-- Räume-Tabelle (ERWEITERT um city_id)
 CREATE TABLE IF NOT EXISTS rooms (
     id INT AUTO_INCREMENT PRIMARY KEY,
     room_id VARCHAR(100) UNIQUE NOT NULL,
     mission_id VARCHAR(100) NULL,
+    city_id VARCHAR(100) NULL,  -- NEU: Verknüpfung zu Stadt
     name VARCHAR(255) NOT NULL,
     description TEXT,
     background_image VARCHAR(255),
@@ -62,8 +98,10 @@ CREATE TABLE IF NOT EXISTS rooms (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (mission_id) REFERENCES missions(mission_id) ON DELETE SET NULL,
+    FOREIGN KEY (city_id) REFERENCES cities(city_id) ON DELETE SET NULL,  -- NEU
     INDEX idx_room_id (room_id),
     INDEX idx_mission_id (mission_id),
+    INDEX idx_city_id (city_id),  -- NEU
     INDEX idx_is_locked (is_locked),
     INDEX idx_required_level (required_level)
 );
@@ -116,7 +154,7 @@ CREATE TABLE IF NOT EXISTS game_states (
     current_mission VARCHAR(100) NULL,
     inventory JSON DEFAULT '[]',
     progress JSON DEFAULT '{}',
-    bitcoins DECIMAL(10,8) DEFAULT 0.00000000,
+    bitcoins DECIMAL(10,8) DEFAULT 0.00250000,
     experience_points INT DEFAULT 0,
     level INT DEFAULT 1,
     health INT DEFAULT 100,
@@ -283,6 +321,7 @@ CREATE TABLE IF NOT EXISTS room_objects (
     status ENUM('available', 'locked', 'hidden') DEFAULT 'available',
     compatible_items JSON DEFAULT '[]',
     required_items JSON DEFAULT '[]',
+    required_missions_completed BOOLEAN DEFAULT FALSE,  -- NEU: Nur verfügbar wenn alle Missionen abgeschlossen
     puzzle_id VARCHAR(100) NULL,       -- Verknüpfung zu Rätsel
     exit_room_id VARCHAR(100) NULL,    -- Verknüpfung zu Ziel-Raum
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -291,7 +330,8 @@ CREATE TABLE IF NOT EXISTS room_objects (
     FOREIGN KEY (puzzle_id) REFERENCES puzzles(puzzle_id) ON DELETE SET NULL,
     UNIQUE KEY unique_room_object (room_id, object_id),
     INDEX idx_room_id (room_id),
-    INDEX idx_object_type (object_type)
+    INDEX idx_object_type (object_type),
+    INDEX idx_required_missions_completed (required_missions_completed)
 );
 
 -- Zuordnungstabelle: Items in Räumen
@@ -322,9 +362,98 @@ ON DUPLICATE KEY UPDATE
     reward_bitcoins = VALUES(reward_bitcoins),
     reward_exp = VALUES(reward_exp);
 
--- Räume für Crypto Bank Mission
+-- Mission 2: Server Farm Mission (Building 1)
+INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp) 
+VALUES ('mission2_server_farm', 'Server Farm Mission', 'Hacke dich in die Server Farm ein und stehle wertvolle Daten von den Servern', 2, 2, 0.00200000, 200)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    difficulty = VALUES(difficulty),
+    required_level = VALUES(required_level),
+    reward_bitcoins = VALUES(reward_bitcoins),
+    reward_exp = VALUES(reward_exp);
+
+-- Mission 3: Tech Office Mission (Building 2)
+INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp) 
+VALUES ('mission3_office', 'Tech Office Mission', 'Hacke dich in das Tech Office ein und stehle vertrauliche Daten', 3, 3, 0.00300000, 300)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    difficulty = VALUES(difficulty),
+    required_level = VALUES(required_level),
+    reward_bitcoins = VALUES(reward_bitcoins),
+    reward_exp = VALUES(reward_exp);
+
+-- Mission 4: Research Lab Mission (Building 3)
+INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp) 
+VALUES ('mission4_lab', 'Research Lab Mission', 'Infiltriere das Forschungslabor und finde geheime Projekte', 4, 4, 0.00400000, 400)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    difficulty = VALUES(difficulty),
+    required_level = VALUES(required_level),
+    reward_bitcoins = VALUES(reward_bitcoins),
+    reward_exp = VALUES(reward_exp);
+
+-- Mission 5: Data Warehouse Mission (Building 4)
+INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp) 
+VALUES ('mission5_warehouse', 'Data Warehouse Mission', 'Durchsuche das Data Warehouse nach wertvollen Informationen', 5, 5, 0.00500000, 500)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    difficulty = VALUES(difficulty),
+    required_level = VALUES(required_level),
+    reward_bitcoins = VALUES(reward_bitcoins),
+    reward_exp = VALUES(reward_exp);
+
+-- Mission 6: Executive Penthouse Mission (Building 5)
+INSERT INTO missions (mission_id, name, description, difficulty, required_level, reward_bitcoins, reward_exp) 
+VALUES ('mission6_penthouse', 'Executive Penthouse Mission', 'Hacke dich in die Luxus-Penthouse ein und finde geheime Dokumente', 6, 6, 0.00600000, 600)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    difficulty = VALUES(difficulty),
+    required_level = VALUES(required_level),
+    reward_bitcoins = VALUES(reward_bitcoins),
+    reward_exp = VALUES(reward_exp);
+
+-- ========================================
+-- CITY-SYSTEM ERSTELLEN
+-- ========================================
+
+-- Stadt 1: Cyberpunk City
+INSERT INTO cities (city_id, name, description, is_available, required_level) VALUES
+('city1', 'Cyberpunk City', 'Eine futuristische Stadt mit Hochhäusern und digitalen Anzeigen. Hier findest du verschiedene Missionen in den verschiedenen Gebäuden.', TRUE, 1)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    is_available = VALUES(is_available),
+    required_level = VALUES(required_level);
+
+-- Stadt 2: Downtown District (später verfügbar)
+INSERT INTO cities (city_id, name, description, is_available, required_level) VALUES
+('city2', 'Downtown District', 'Das Geschäftsviertel der Stadt mit noch höheren Gebäuden und komplexeren Missionen.', FALSE, 5)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    is_available = VALUES(is_available),
+    required_level = VALUES(required_level);
+
+-- Missionen für City 1 zuordnen
+INSERT INTO city_missions (city_id, mission_id, building_number, building_name, building_description, is_required) VALUES
+('city1', 'mission2_server_farm', 1, 'Server Farm Tower', 'Ein Hochhaus voller Server und Datenbanken. Hier kannst du wertvolle Daten von den Servern stehlen.', TRUE),
+('city1', 'mission3_office', 2, 'Tech Office Building', 'Ein Bürogebäude einer Tech-Firma. Hier gibt es interessante Daten zu hacken.', TRUE),
+('city1', 'mission4_lab', 3, 'Research Laboratory', 'Ein Forschungslabor mit geheimen Projekten. Vorsicht vor den Sicherheitssystemen.', TRUE),
+('city1', 'mission5_warehouse', 4, 'Data Warehouse', 'Ein Lagerhaus voller Server und Daten. Perfekt für Datendiebstahl.', TRUE),
+('city1', 'mission6_penthouse', 5, 'Executive Penthouse', 'Eine Luxus-Penthouse-Wohnung mit hochwertigen Sicherheitssystemen.', TRUE)
+ON DUPLICATE KEY UPDATE 
+    building_name = VALUES(building_name),
+    building_description = VALUES(building_description),
+    is_required = VALUES(is_required);
+
+-- Räume für Crypto Bank Mission (intro bleibt unverändert)
 INSERT INTO rooms (room_id, mission_id, name, description, background_image, is_locked, required_level, connections) VALUES
-('intro', 'mission1_crypto_bank', 'Einführung', 'Willkommen in der Welt des ethischen Hackings. Hier beginnt deine Reise als angehender Hacker.', 'room-bedroom.png', false, 1, '{"city1-room": {"id": "city1-room", "name": "Stadtansicht", "description": "Hochhäuser und digitale Stadtlandschaft"}}')
+('intro', 'mission1_crypto_bank', 'Einführung', 'Willkommen in der Welt des ethischen Hackings. Hier beginnt deine Reise als angehender Hacker.', 'room-bedroom.png', false, 1, '{"city1": {"id": "city1", "name": "Cyberpunk City", "description": "Hochhäuser und digitale Stadtlandschaft"}}')
 ON DUPLICATE KEY UPDATE 
     mission_id = VALUES(mission_id),
     name = VALUES(name),
@@ -334,12 +463,41 @@ ON DUPLICATE KEY UPDATE
     required_level = VALUES(required_level),
     connections = VALUES(connections);
 
+-- City 1 Hub-Raum (ohne Mission)
+INSERT INTO rooms (room_id, city_id, name, description, background_image, is_locked, required_level, connections) VALUES
+('city1', 'city1', 'Cyberpunk City', 'Eine futuristische Stadt mit Hochhäusern und digitalen Anzeigen. Hier findest du verschiedene Missionen in den verschiedenen Gebäuden.', 'city1-background.png', false, 1, '{"intro": {"id": "intro", "name": "Zuhause", "description": "Zurück zu deinem Zimmer"}, "city2": {"id": "city2", "name": "Downtown District", "description": "Weiter zur nächsten Stadt"}}')
+ON DUPLICATE KEY UPDATE 
+    city_id = VALUES(city_id),
+    name = VALUES(name),
+    description = VALUES(description),
+    background_image = VALUES(background_image),
+    is_locked = VALUES(is_locked),
+    required_level = VALUES(required_level),
+    connections = VALUES(connections);
+
+-- Mission-Räume für die 5 Gebäude
+INSERT INTO rooms (room_id, mission_id, city_id, name, description, background_image, is_locked, required_level, connections) VALUES
+('building1_server_farm', 'mission2_server_farm', 'city1', 'Server Farm Lobby', 'Die Eingangshalle der Server Farm. Hier beginnt deine Mission.', 'building1-server-farm.png', false, 2, '{"city1": {"id": "city1", "name": "Zurück zur Stadt", "description": "Zurück zur Stadtansicht"}}'),
+('building2_office', 'mission3_office', 'city1', 'Tech Office', 'Ein modernes Büro mit vielen Computern und Netzwerkgeräten.', 'building2-office.png', false, 3, '{"city1": {"id": "city1", "name": "Zurück zur Stadt", "description": "Zurück zur Stadtansicht"}}'),
+('building3_lab', 'mission4_lab', 'city1', 'Research Lab', 'Ein Forschungslabor mit High-Tech-Ausrüstung und Sicherheitssystemen.', 'building3-lab.png', false, 4, '{"city1": {"id": "city1", "name": "Zurück zur Stadt", "description": "Zurück zur Stadtansicht"}}'),
+('building4_warehouse', 'mission5_warehouse', 'city1', 'Data Warehouse', 'Ein großes Lagerhaus voller Server und Datenbanken.', 'building4-warehouse.png', false, 5, '{"city1": {"id": "city1", "name": "Zurück zur Stadt", "description": "Zurück zur Stadtansicht"}}'),
+('building5_penthouse', 'mission6_penthouse', 'city1', 'Executive Penthouse', 'Eine luxuriöse Penthouse-Wohnung mit modernster Sicherheitstechnik.', 'building5-penthouse.png', false, 6, '{"city1": {"id": "city1", "name": "Zurück zur Stadt", "description": "Zurück zur Stadtansicht"}}')
+ON DUPLICATE KEY UPDATE 
+    mission_id = VALUES(mission_id),
+    city_id = VALUES(city_id),
+    name = VALUES(name),
+    description = VALUES(description),
+    background_image = VALUES(background_image),
+    is_locked = VALUES(is_locked),
+    required_level = VALUES(required_level),
+    connections = VALUES(connections);
+
 -- Raum-Objekte für den intro Raum
-INSERT INTO room_objects (room_id, object_id, name, description, object_type, x_position, y_position, width, height, icon, compatible_items, required_items) VALUES
-('intro', 'computer', 'Computer', 'Mein Desktop-Computer. Hier kann ich hacken, Programme schreiben und Missionen starten.', 'puzzle', 12.0, 35.0, 20.0, 15.0, 'Zap', '["laptop", "usb_stick", "hacking_manual"]', '[]'),
-('intro', 'window', 'Fenster', 'Ein abgedunkeltes Fenster. Hier kann ich die Außenwelt beobachten und Informationen sammeln.', 'puzzle', 47.5, 10.0, 25.0, 20.0, 'Eye', '["keycard", "hacking_manual"]', '[]'),
-('intro', 'smartphone', 'Smartphone', 'Mein Smartphone. Hier kann ich Nachrichten empfangen, Apps nutzen und Kontakte verwalten.', 'puzzle', 30.0, 60.0, 12.0, 8.0, 'Package', '["usb_stick", "energy_drink"]', '[]'),
-('intro', 'door', 'Tür', 'Die Zimmertür. Hier kann ich das Zimmer verlassen und auf Missionen gehen.', 'exit', 80.0, 20.0, 12.0, 18.0, 'DoorOpen', '["keycard"]', '["keycard"]')
+INSERT INTO room_objects (room_id, object_id, name, description, object_type, x_position, y_position, width, height, icon, exit_room_id, compatible_items, required_items, required_missions_completed) VALUES
+('intro', 'computer', 'Computer', 'Mein Desktop-Computer. Hier kann ich hacken, Programme schreiben und Missionen starten.', 'puzzle', 12.0, 35.0, 20.0, 15.0, 'Zap', NULL, '["laptop", "usb_stick", "hacking_manual"]', '[]', FALSE),
+('intro', 'window', 'Fenster', 'Ein abgedunkeltes Fenster. Hier kann ich die Außenwelt beobachten und Informationen sammeln.', 'puzzle', 47.5, 10.0, 25.0, 20.0, 'Eye', NULL, '["keycard", "hacking_manual"]', '[]', FALSE),
+('intro', 'smartphone', 'Smartphone', 'Mein Smartphone. Hier kann ich Nachrichten empfangen, Apps nutzen und Kontakte verwalten.', 'puzzle', 30.0, 60.0, 12.0, 8.0, 'Package', NULL, '["usb_stick", "energy_drink"]', '[]', FALSE),
+('intro', 'door', 'Tür', 'Die Zimmertür. Hier kann ich das Zimmer verlassen und auf Missionen gehen. Nur verfügbar wenn die Crypto Bank Mission abgeschlossen ist.', 'exit', 80.0, 20.0, 12.0, 18.0, 'DoorOpen', 'city1', '["keycard"]', '["keycard"]', TRUE)
 ON DUPLICATE KEY UPDATE 
     name = VALUES(name),
     description = VALUES(description),
@@ -349,8 +507,38 @@ ON DUPLICATE KEY UPDATE
     width = VALUES(width),
     height = VALUES(height),
     icon = VALUES(icon),
+    exit_room_id = VALUES(exit_room_id),
     compatible_items = VALUES(compatible_items),
-    required_items = VALUES(required_items);
+    required_items = VALUES(required_items),
+    required_missions_completed = VALUES(required_missions_completed);
+
+-- Raum-Objekte für city1 (7 Objekte: Back To Home, 5 Gebäude, Step Forward)
+INSERT INTO room_objects (room_id, object_id, name, description, object_type, x_position, y_position, width, height, icon, exit_room_id, required_missions_completed) VALUES
+-- Back To Home (ganz links)
+('city1', 'back_to_home', 'Zurück nach Hause', 'Zurück zu deinem Zimmer. Hier kannst du dich ausruhen und neue Missionen planen.', 'exit', 5.0, 70.0, 12.0, 20.0, 'Home', 'intro', FALSE),
+-- Gebäude 1: Server Farm
+('city1', 'building1', 'Server Farm Tower', 'Ein Hochhaus voller Server und Datenbanken. Hier kannst du wertvolle Daten von den Servern stehlen.', 'exit', 20.0, 60.0, 15.0, 30.0, 'Building', 'building1_server_farm', FALSE),
+-- Gebäude 2: Tech Office
+('city1', 'building2', 'Tech Office Building', 'Ein Bürogebäude einer Tech-Firma. Hier gibt es interessante Daten zu hacken.', 'exit', 37.0, 60.0, 15.0, 30.0, 'Building', 'building2_office', FALSE),
+-- Gebäude 3: Research Lab
+('city1', 'building3', 'Research Laboratory', 'Ein Forschungslabor mit geheimen Projekten. Vorsicht vor den Sicherheitssystemen.', 'exit', 54.0, 60.0, 15.0, 30.0, 'Building', 'building3_lab', FALSE),
+-- Gebäude 4: Data Warehouse
+('city1', 'building4', 'Data Warehouse', 'Ein Lagerhaus voller Server und Daten. Perfekt für Datendiebstahl.', 'exit', 71.0, 60.0, 15.0, 30.0, 'Building', 'building4_warehouse', FALSE),
+-- Gebäude 5: Executive Penthouse
+('city1', 'building5', 'Executive Penthouse', 'Eine Luxus-Penthouse-Wohnung mit hochwertigen Sicherheitssystemen.', 'exit', 88.0, 60.0, 15.0, 30.0, 'Building', 'building5_penthouse', FALSE),
+-- Step Forward (ganz rechts) - nur verfügbar wenn alle Missionen abgeschlossen
+('city1', 'step_forward', 'Weiter zur nächsten Stadt', 'Weiter zum Downtown District. Nur verfügbar wenn alle Missionen in dieser Stadt abgeschlossen sind.', 'exit', 95.0, 70.0, 12.0, 20.0, 'ArrowRight', 'city2', TRUE)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    object_type = VALUES(object_type),
+    x_position = VALUES(x_position),
+    y_position = VALUES(y_position),
+    width = VALUES(width),
+    height = VALUES(height),
+    icon = VALUES(icon),
+    exit_room_id = VALUES(exit_room_id),
+    required_missions_completed = VALUES(required_missions_completed);
 
 
 -- ========================================
@@ -469,7 +657,7 @@ ON DUPLICATE KEY UPDATE
 
 -- Test-User
 INSERT INTO users (id, username, password_hash, email, is_admin) VALUES
-(1, 'testuser', '$2b$10$test', 'test@example.com', FALSE)
+(1, 'admin', '$2a$12$uT1SkuVC84vByFewn9kIPuWtjpsG0fmw7ldwfZcaO95rJgZjU218y', 'test@example.com', FALSE)
 ON DUPLICATE KEY UPDATE 
     username = VALUES(username),
     password_hash = VALUES(password_hash),

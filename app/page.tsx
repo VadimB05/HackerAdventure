@@ -76,21 +76,9 @@ export default function HomePage() {
         console.log('Loading game with data:', data);
         
         if (data.hasGameProgress && data.gameState) {
-          // Spielstandsdaten als URL-Parameter übergeben
-          const params = new URLSearchParams({
-            continue: 'true',
-            room: data.gameState.currentRoom,
-            bitcoins: data.gameState.bitcoins.toString(),
-            exp: data.gameState.experiencePoints.toString(),
-            level: data.gameState.level.toString()
-          });
-          
-          if (data.gameState.currentMission) {
-            params.append('mission', data.gameState.currentMission);
-          }
-          
+
           // Zur Game-Seite weiterleiten
-          window.location.href = `/game?${params.toString()}`;
+          window.location.href = `/game?`;
         } else {
           console.error('No game progress found');
         }

@@ -32,6 +32,8 @@ interface InteractiveObject {
   // Drag-and-Drop Kompatibilität
   compatibleItems?: string[]; // Array von Item-IDs die kompatibel sind
   requiredItems?: string[]; // Array von Item-IDs die benötigt werden
+  // Exit-spezifische Felder
+  exit_room_id?: string; // Ziel-Raum für Exit-Objekte
 }
 
 interface RoomViewProps {
@@ -100,6 +102,21 @@ export default function RoomView({
   const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
   const [missionCompleted, setMissionCompleted] = useState<boolean | undefined>(undefined);
 
+  // City Mission Status State
+  const [cityMissionStatus, setCityMissionStatus] = useState<{
+    allMissionsCompleted: boolean;
+    totalMissions: number;
+    completedMissions: number;
+    missions: Array<{
+      missionId: string;
+      buildingNumber: number;
+      buildingName: string;
+      isRequired: boolean;
+      isCompleted: boolean;
+      completedAt: string | null;
+    }>;
+  } | null>(null);
+
   // Cleanup Timer beim Unmount
   React.useEffect(() => {
     return () => {
@@ -115,6 +132,7 @@ export default function RoomView({
     loadRoomItems();
     loadGameProgress();
     loadAvailableExits();
+    loadCityMissionStatus();
   }, [roomId]);
 
   const loadRoomData = async () => {
@@ -229,6 +247,75 @@ export default function RoomView({
     }
   };
 
+  const loadCityMissionStatus = async () => {
+    // Für Intro-Raum: Prüfe mission1_crypto_bank Status
+    if (roomId === 'intro') {
+      try {
+        const response = await fetch(`/api/game/progress/mission`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            missionId: 'mission1_crypto_bank',
+            stepId: 'check'
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setCityMissionStatus({
+            allMissionsCompleted: data.isCompleted,
+            totalMissions: 1,
+            completedMissions: data.isCompleted ? 1 : 0,
+            missions: [{
+              missionId: 'mission1_crypto_bank',
+              buildingNumber: 1,
+              buildingName: 'Crypto Bank Mission',
+              isRequired: true,
+              isCompleted: data.isCompleted,
+              completedAt: data.isCompleted ? new Date().toISOString() : null
+            }]
+          });
+          console.log('Intro Mission Status geladen:', data);
+        } else {
+          console.error('Fehler beim Laden des Intro Mission Status:', data.error);
+        }
+      } catch (error) {
+        console.error('Netzwerkfehler beim Laden des Intro Mission Status:', error);
+      }
+      return;
+    }
+
+    // Nur laden wenn wir in einer Stadt sind (city1, city2, etc.)
+    if (!roomId.startsWith('city')) {
+      setCityMissionStatus(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/game/city/${roomId}/missions-status`, {
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setCityMissionStatus({
+          allMissionsCompleted: data.allMissionsCompleted,
+          totalMissions: data.totalMissions,
+          completedMissions: data.completedMissions,
+          missions: data.missions
+        });
+        console.log('City Mission Status geladen:', data);
+      } else {
+        console.error('Fehler beim Laden des City Mission Status:', data.error);
+      }
+    } catch (error) {
+      console.error('Netzwerkfehler beim Laden des City Mission Status:', error);
+    }
+  };
+
   const clearFeedback = () => {
     setShowFeedback(false);
     setFeedbackData(null);
@@ -323,11 +410,42 @@ export default function RoomView({
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
   const [roomError, setRoomError] = useState<string | null>(null);
 
-  const interactiveObjects = roomData?.objects?.map((obj: any) => ({
-    ...obj,
-    isVisible: true,
-    isInteractable: true
-  })) || [];
+  const interactiveObjects = roomData?.objects?.map((obj: any) => {
+    // Prüfen ob Objekt Mission-Abschluss erfordert
+    const requiresMissionsCompleted = obj.required_missions_completed === true;
+    
+    // Wenn Mission-Abschluss erforderlich ist, prüfen ob alle Missionen abgeschlossen sind
+    let isVisible = true;
+    let isInteractable = true;
+    
+    if (requiresMissionsCompleted) {
+      if (cityMissionStatus) {
+        // Für Intro-Raum: Prüfe nur die erste Mission
+        if (roomId === 'intro') {
+          const introMission = cityMissionStatus.missions?.[0];
+          isVisible = introMission?.isCompleted || false;
+          isInteractable = introMission?.isCompleted || false;
+        } else {
+          // Für City-Räume: Prüfe alle Missionen
+          isVisible = cityMissionStatus.allMissionsCompleted;
+          isInteractable = cityMissionStatus.allMissionsCompleted;
+        }
+      } else {
+        // Wenn Status noch nicht geladen ist, verstecken
+        isVisible = false;
+        isInteractable = false;
+      }
+    }
+    
+    return {
+      ...obj,
+      // Feldzuordnung korrigieren
+      type: obj.type || obj.object_type || 'item', // Fallback zu 'item' wenn kein Typ definiert
+      exit_room_id: obj.exitRoomId || obj.exit_room_id,
+      isVisible: isVisible && obj.isVisible !== false,
+      isInteractable: isInteractable && obj.isInteractable !== false
+    };
+  }) || [];
 
   // Drag-and-Drop Handler
   const handleDragStart = (item: InventoryItem, event: React.DragEvent) => {
@@ -497,7 +615,10 @@ export default function RoomView({
   // Objekt-Klick-Handler
   const handleObjectClick = (object: InteractiveObject) => {
     console.log('Object clicked:', object.id, object.type);
-    if (!object.isInteractable) return;
+    
+    if (!object.isInteractable) {
+      return;
+    }
     
     // Prüfen ob es ein aufhebbares Item ist
     const roomItem = roomItems.find(item => item.id === object.id);
@@ -515,6 +636,20 @@ export default function RoomView({
     
     // Exit-Behandlung
     if (object.type === 'exit') {
+      // Spezielle Behandlung für Tür im Intro-Raum
+      if (object.id === 'door' && roomId === 'intro' && object.exit_room_id) {
+        // Direkt zu city1 wechseln
+        handleRoomChange('door', object.exit_room_id);
+        return;
+      }
+      
+      // Allgemeine Exit-Behandlung für alle Exit-Objekte mit exit_room_id
+      if (object.exit_room_id) {
+        // Direkt zum Ziel-Raum wechseln
+        handleRoomChange(object.id, object.exit_room_id);
+        return;
+      }
+      
       const exit = availableExits.find(e => e.id === object.id);
       if (exit) {
         if (exit.isUnlocked) {
@@ -616,8 +751,18 @@ export default function RoomView({
           setIsChangingRoom(false);
         }, 1000);
       } else {
-        console.error('Fehler beim Raumwechsel:', result.error);
+        // Raumwechsel gesperrt - Objekt rot blinken lassen
+        console.log('Raumwechsel gesperrt:', result.error);
         setIsChangingRoom(false);
+        
+        // Rotes Blinken für das Objekt
+        const objectElement = document.querySelector(`[data-object-id="${exitId}"]`);
+        if (objectElement) {
+          objectElement.classList.add('animate-red-blink');
+          setTimeout(() => {
+            objectElement.classList.remove('animate-red-blink');
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error('Netzwerkfehler beim Raumwechsel:', error);
@@ -757,6 +902,9 @@ export default function RoomView({
                 {object.icon === 'MapPin' && <MapPin className="h-6 w-6" />}
                 {object.icon === 'Coins' && <Coins className="h-6 w-6" />}
                 {object.icon === 'DoorOpen' && <DoorOpen className="h-6 w-6" />}
+                {object.icon === 'ArrowRight' && <ArrowRight className="h-6 w-6" />}
+                {object.icon === 'Home' && <MapPinIcon className="h-6 w-6" />}
+                {object.icon === 'Building' && <Server className="h-6 w-6" />}
               </div>
               
               {/* Status-Badge */}
@@ -765,6 +913,22 @@ export default function RoomView({
                   ✓
                 </Badge>
               )}
+              
+              {/* Step Forward Badge - nur anzeigen wenn alle Missionen abgeschlossen sind */}
+              {object.id === 'step_forward' && cityMissionStatus?.allMissionsCompleted && (
+                <Badge className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs animate-pulse">
+                  →
+                </Badge>
+              )}
+              
+              {/* Mission Progress Badge für Step Forward */}
+              {object.id === 'step_forward' && cityMissionStatus && !cityMissionStatus.allMissionsCompleted && (
+                <Badge className="absolute -top-2 -right-2 bg-gray-600 text-white text-xs">
+                  {cityMissionStatus.completedMissions}/{cityMissionStatus.totalMissions}
+                </Badge>
+              )}
+              
+
               
               {/* Drag-Over Indicator */}
               {dragOverObject === object.id && (

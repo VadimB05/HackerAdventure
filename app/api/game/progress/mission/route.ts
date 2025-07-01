@@ -5,20 +5,20 @@ import { executeQuery, executeQuerySingle, executeTransaction } from '@/lib/data
 /**
  * Mission-Progress prüfen und aktualisieren
  * POST /api/game/progress/mission
- * Body: { roomId: string }
+ * Body: { roomId?: string, missionId?: string, stepId?: string }
  */
 export async function POST(request: NextRequest) {
   return requireAuth(async (req) => {
     try {
       const userId = req.user!.id;
       const body = await request.json();
-      const { roomId } = body;
+      const { roomId, missionId: bodyMissionId, stepId } = body;
 
-      console.log(`[DEBUG] Mission-Progress-API aufgerufen für roomId: ${roomId}, userId: ${userId}`);
+      console.log(`[DEBUG] Mission-Progress-API aufgerufen für roomId: ${roomId}, missionId: ${bodyMissionId}, stepId: ${stepId}, userId: ${userId}`);
 
-      let missionId: string | null = null;
+      let missionId: string | null = bodyMissionId || null;
 
-      if (roomId) {
+      if (!missionId && roomId) {
         // Mission-ID für den Raum abrufen
         const room = await executeQuerySingle<{mission_id: string}>(
           'SELECT mission_id FROM rooms WHERE room_id = ?',
@@ -110,7 +110,18 @@ export async function POST(request: NextRequest) {
 
       console.log(`[DEBUG] Mission-Belohnungen:`, mission);
 
-      if (isMissionCompleted) {
+      // Wenn stepId 'completed' ist, markiere Mission als abgeschlossen
+      if (stepId === 'completed') {
+        console.log(`[DEBUG] Markiere Mission als abgeschlossen (stepId: completed)`);
+        
+        // Mission als abgeschlossen markieren
+        transactionQueries.push({
+          query: `INSERT INTO mission_progress (user_id, mission_id, is_completed, completed_at) 
+                  VALUES (?, ?, true, NOW()) 
+                  ON DUPLICATE KEY UPDATE is_completed = true, completed_at = NOW()`,
+          params: [userId, missionId]
+        });
+      } else if (isMissionCompleted) {
         console.log(`[DEBUG] Mission ist abgeschlossen - prüfe Status`);
         
         // Prüfen, ob die Mission bereits abgeschlossen wurde
@@ -123,7 +134,7 @@ export async function POST(request: NextRequest) {
         console.log(`[DEBUG] Existing progress type:`, typeof existingProgress?.is_completed);
         console.log(`[DEBUG] Existing progress value:`, existingProgress?.is_completed);
 
-        const isAlreadyCompleted = existingProgress?.is_completed === true;
+        const isAlreadyCompleted = Boolean(existingProgress?.is_completed);
         console.log(`[DEBUG] Mission bereits abgeschlossen: ${isAlreadyCompleted}`);
 
         // Nur den Status markieren, keine Belohnungen vergeben

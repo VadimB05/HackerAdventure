@@ -91,17 +91,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Mission-Anforderungen prüfen
+    if (roomId === 'city1') {
+      // Prüfe ob mission1_crypto_bank abgeschlossen ist
+      const missionProgress = await executeQuerySingle<{is_completed: boolean}>(
+        'SELECT is_completed FROM mission_progress WHERE user_id = ? AND mission_id = ?',
+        [userId, 'mission1_crypto_bank']
+      );
+
+      if (!missionProgress || !missionProgress.is_completed) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Du musst zuerst die Crypto Bank Mission abschließen, bevor du die Stadt betreten kannst.' 
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Raumwechsel durchführen
     await executeQuery(
       'UPDATE game_states SET current_room = ?, current_mission = ? WHERE user_id = ?',
       [roomId, missionId || room.mission_id, userId]
     );
 
-    // Raum-Besuch protokollieren
-    await executeQuery(
-      'INSERT INTO room_visits (user_id, room_id, mission_id) VALUES (?, ?, ?)',
-      [userId, roomId, missionId || room.mission_id]
-    );
+    // Raum-Besuch protokollieren (Tabelle existiert noch nicht)
+    // await executeQuery(
+    //   'INSERT INTO room_visits (user_id, room_id, mission_id) VALUES (?, ?, ?)',
+    //   [userId, roomId, missionId || room.mission_id]
+    // );
 
     // Statistiken aktualisieren
     await executeQuery(

@@ -4,7 +4,7 @@ import { useGameState } from "./game-context"
 import Terminal from "./terminal"
 import Smartphone from "./smartphone"
 import PointAndClick from "./point-and-click"
-import DarknetChat from "./darknet-chat"
+// import DarknetChat from "./darknet-chat"
 import GameState from "./game-state"
 import Basement from "./basement"
 import DecisionModal from "./decision-modal"
@@ -140,8 +140,33 @@ export default function GameLayout() {
         return "intro"; // Das Apartment ist immer der intro-Raum
       case "basement":
         return "basement";
+      case "city":
+        return "city1"; // City-View zeigt city1
       default:
         return "intro";
+    }
+  };
+
+  // Raumwechsel-Handler
+  const handleRoomChange = (newRoomId: string) => {
+    console.log('Room change requested to:', newRoomId);
+    
+    // Bestimme die entsprechende View basierend auf dem neuen Raum
+    switch (newRoomId) {
+      case "intro":
+        setCurrentView("apartment");
+        break;
+      case "basement":
+        setCurrentView("basement");
+        break;
+      case "city1":
+      case "city2":
+        setCurrentView("city");
+        break;
+      default:
+        // Für unbekannte Räume zur Apartment-View wechseln
+        setCurrentView("apartment");
+        break;
     }
   };
 
@@ -168,32 +193,7 @@ export default function GameLayout() {
               <Server className="mr-2 h-4 w-4" />
               Basement
             </Button>
-            {/* City-Button nur anzeigen, wenn NICHT im Apartment oder Basement */}
-            {(currentView !== "apartment" && currentView !== "basement") && (
-              <Button
-                variant={currentView === "city" ? "default" : "outline"}
-                onClick={() => setCurrentView("city")}
-                className="bg-black border-green-500 text-green-500 hover:bg-green-900"
-              >
-                <MapPin className="mr-2 h-4 w-4" />
-                City
-              </Button>
-            )}
           </div>
-
-          {/* Digitale Tools nur anzeigen, wenn NICHT im Apartment oder Basement */}
-          {(currentView !== "apartment" && currentView !== "basement") && (
-            <div className="flex space-x-2">
-              <Button
-                variant={currentView === "terminal" ? "default" : "outline"}
-                onClick={() => setCurrentView("terminal")}
-                className="bg-black border-green-500 text-green-500 hover:bg-green-900"
-              >
-                <Monitor className="mr-2 h-4 w-4" />
-                Terminal
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Raum-Informationen */}
@@ -202,6 +202,14 @@ export default function GameLayout() {
             <div className="text-center">
               <h3 className="text-green-400 font-bold text-sm">Mein Zimmer</h3>
               <p className="text-green-300 text-xs">Ein abgedunkeltes Zimmer mit Computer, Fenster und Smartphone.</p>
+            </div>
+          </div>
+        )}
+        {currentView === "city" && (
+          <div className="bg-black/70 backdrop-blur-sm border border-green-500 rounded-lg px-3 py-2">
+            <div className="text-center">
+              <h3 className="text-green-400 font-bold text-sm">City District</h3>
+              <p className="text-green-300 text-xs">Ein Stadtteil mit verschiedenen Gebäuden und Missionen.</p>
             </div>
           </div>
         )}
@@ -218,9 +226,19 @@ export default function GameLayout() {
             inventory={inventory}
             onItemUse={handleItemUse}
             onInventoryUpdate={handleInventoryUpdate}
+            onRoomChange={handleRoomChange}
           />
         )}
         {currentView === "basement" && <Basement />}
+        {currentView === "city" && (
+          <RoomView 
+            roomId={getCurrentRoomId()} 
+            inventory={inventory}
+            onItemUse={handleItemUse}
+            onInventoryUpdate={handleInventoryUpdate}
+            onRoomChange={handleRoomChange}
+          />
+        )}
       </main>
 
       {/* Modals und Popups */}
