@@ -111,10 +111,38 @@ export default function RoomView({
 
   // Raum laden
   useEffect(() => {
+    loadRoomData();
     loadRoomItems();
     loadGameProgress();
     loadAvailableExits();
   }, [roomId]);
+
+  const loadRoomData = async () => {
+    setIsLoadingRoom(true);
+    setRoomError(null);
+    
+    try {
+      const response = await fetch(`/api/game/rooms/${roomId}`, {
+        credentials: 'include'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.room) {
+        setRoomData(data.room);
+        console.log('Raum-Daten geladen:', data.room);
+        console.log('Background-Pfad:', data.room.background);
+      } else {
+        setRoomError(data.error || 'Fehler beim Laden des Raums');
+        console.error('Fehler beim Laden des Raums:', data.error);
+      }
+    } catch (error) {
+      setRoomError('Netzwerkfehler beim Laden des Raums');
+      console.error('Netzwerkfehler beim Laden des Raums:', error);
+    } finally {
+      setIsLoadingRoom(false);
+    }
+  };
 
   const loadRoomItems = async () => {
     try {
@@ -279,76 +307,27 @@ export default function RoomView({
     }
   };
 
-  // Mock-Raumdaten für das eigene Zimmer
-  const roomData = {
-    id: roomId,
-    name: 'Mein Zimmer',
-    description: 'Ein abgedunkeltes Zimmer mit Computer, Fenster und Smartphone.',
-    background: '/room-bedroom.png',
-    objects: [
-      {
-        id: 'computer',
-        name: 'Computer',
-        description: 'Mein Desktop-Computer. Hier kann ich hacken, Programme schreiben und Missionen starten.',
-        type: 'puzzle' as const,
-        x: 12,
-        y: 35,
-        width: 20,
-        height: 15,
-        status: 'available',
-        icon: 'Zap',
-        compatibleItems: ['laptop', 'usb_stick', 'hacking_manual'],
-        requiredItems: []
-      },
-      {
-        id: 'window',
-        name: 'Fenster',
-        description: 'Ein abgedunkeltes Fenster. Hier kann ich die Außenwelt beobachten und Informationen sammeln.',
-        type: 'puzzle' as const,
-        x: 47.5,
-        y: 10,
-        width: 25,
-        height: 20,
-        status: 'available',
-        icon: 'Eye',
-        compatibleItems: ['keycard', 'hacking_manual'],
-        requiredItems: []
-      },
-      {
-        id: 'smartphone',
-        name: 'Smartphone',
-        description: 'Mein Smartphone. Hier kann ich Nachrichten empfangen, Apps nutzen und Kontakte verwalten.',
-        type: 'puzzle' as const,
-        x: 30,
-        y: 60,
-        width: 12,
-        height: 8,
-        status: 'available',
-        icon: 'Package',
-        compatibleItems: ['usb_stick', 'energy_drink'],
-        requiredItems: []
-      },
-      {
-        id: 'door',
-        name: 'Tür',
-        description: 'Die Zimmertür. Hier kann ich das Zimmer verlassen und auf Missionen gehen.',
-        type: 'exit' as const,
-        x: 80,
-        y: 20,
-        width: 12,
-        height: 18,
-        icon: 'DoorOpen',
-        compatibleItems: ['keycard'],
-        requiredItems: ['keycard']
-      }
-    ]
-  };
+  // Raum-Daten State
+  const [roomData, setRoomData] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    background: string;
+    isLocked: boolean;
+    requiredLevel: number;
+    missionId: string;
+    connections: any;
+    objects: any[];
+    puzzles: any[];
+  } | null>(null);
+  const [isLoadingRoom, setIsLoadingRoom] = useState(true);
+  const [roomError, setRoomError] = useState<string | null>(null);
 
-  const interactiveObjects = roomData.objects.map((obj: any) => ({
+  const interactiveObjects = roomData?.objects?.map((obj: any) => ({
     ...obj,
     isVisible: true,
     isInteractable: true
-  }));
+  })) || [];
 
   // Drag-and-Drop Handler
   const handleDragStart = (item: InventoryItem, event: React.DragEvent) => {
@@ -668,6 +647,38 @@ export default function RoomView({
       }
     });
   };
+
+  // Loading State
+  if (isLoadingRoom) {
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-gray-900 flex items-center justify-center">
+        <div className="text-center text-gray-400">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold">Lade Raum...</h2>
+          <p className="mt-2">Raum wird vorbereitet</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error State
+  if (roomError || !roomData) {
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-gray-900 flex items-center justify-center">
+        <div className="text-center text-gray-400">
+          <MapPin className="h-16 w-16 mx-auto mb-4 opacity-50" />
+          <h2 className="text-xl font-bold text-red-400">Fehler beim Laden des Raums</h2>
+          <p className="mt-2">{roomError || 'Unbekannter Fehler'}</p>
+          <Button 
+            onClick={loadRoomData} 
+            className="mt-4 bg-blue-600 hover:bg-blue-700"
+          >
+            Erneut versuchen
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-gray-900">

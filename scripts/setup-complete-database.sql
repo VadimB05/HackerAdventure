@@ -267,6 +267,33 @@ CREATE TABLE IF NOT EXISTS save_points (
     INDEX idx_is_auto_save (is_auto_save)
 );
 
+-- Raum-Objekte (interaktive Objekte in Räumen)
+CREATE TABLE IF NOT EXISTS room_objects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    room_id VARCHAR(100) NOT NULL,
+    object_id VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    object_type ENUM('puzzle', 'exit', 'item', 'decoration') NOT NULL,
+    x_position DECIMAL(5,2) NOT NULL,  -- Prozent-Position X
+    y_position DECIMAL(5,2) NOT NULL,  -- Prozent-Position Y
+    width DECIMAL(5,2) NOT NULL,       -- Prozent-Breite
+    height DECIMAL(5,2) NOT NULL,      -- Prozent-Höhe
+    icon VARCHAR(100),
+    status ENUM('available', 'locked', 'hidden') DEFAULT 'available',
+    compatible_items JSON DEFAULT '[]',
+    required_items JSON DEFAULT '[]',
+    puzzle_id VARCHAR(100) NULL,       -- Verknüpfung zu Rätsel
+    exit_room_id VARCHAR(100) NULL,    -- Verknüpfung zu Ziel-Raum
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE,
+    FOREIGN KEY (puzzle_id) REFERENCES puzzles(puzzle_id) ON DELETE SET NULL,
+    UNIQUE KEY unique_room_object (room_id, object_id),
+    INDEX idx_room_id (room_id),
+    INDEX idx_object_type (object_type)
+);
+
 -- Zuordnungstabelle: Items in Räumen
 CREATE TABLE IF NOT EXISTS room_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -306,6 +333,25 @@ ON DUPLICATE KEY UPDATE
     is_locked = VALUES(is_locked),
     required_level = VALUES(required_level),
     connections = VALUES(connections);
+
+-- Raum-Objekte für den intro Raum
+INSERT INTO room_objects (room_id, object_id, name, description, object_type, x_position, y_position, width, height, icon, compatible_items, required_items) VALUES
+('intro', 'computer', 'Computer', 'Mein Desktop-Computer. Hier kann ich hacken, Programme schreiben und Missionen starten.', 'puzzle', 12.0, 35.0, 20.0, 15.0, 'Zap', '["laptop", "usb_stick", "hacking_manual"]', '[]'),
+('intro', 'window', 'Fenster', 'Ein abgedunkeltes Fenster. Hier kann ich die Außenwelt beobachten und Informationen sammeln.', 'puzzle', 47.5, 10.0, 25.0, 20.0, 'Eye', '["keycard", "hacking_manual"]', '[]'),
+('intro', 'smartphone', 'Smartphone', 'Mein Smartphone. Hier kann ich Nachrichten empfangen, Apps nutzen und Kontakte verwalten.', 'puzzle', 30.0, 60.0, 12.0, 8.0, 'Package', '["usb_stick", "energy_drink"]', '[]'),
+('intro', 'door', 'Tür', 'Die Zimmertür. Hier kann ich das Zimmer verlassen und auf Missionen gehen.', 'exit', 80.0, 20.0, 12.0, 18.0, 'DoorOpen', '["keycard"]', '["keycard"]')
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    object_type = VALUES(object_type),
+    x_position = VALUES(x_position),
+    y_position = VALUES(y_position),
+    width = VALUES(width),
+    height = VALUES(height),
+    icon = VALUES(icon),
+    compatible_items = VALUES(compatible_items),
+    required_items = VALUES(required_items);
+
 
 -- ========================================
 -- RÄTSEL FÜR CRYPTO BANK MISSION
