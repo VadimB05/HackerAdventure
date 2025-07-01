@@ -53,6 +53,12 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
 
   useEffect(() => {
     if (isOpen) {
+      // Reset state when opening modal
+      setCurrentStep(0);
+      setPuzzleProgress({});
+      setIsCompleted(false);
+      setShowPuzzle(false);
+      setError(null);
       fetchMission();
     }
   }, [isOpen, missionId]);
@@ -96,24 +102,42 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
         const mission = missionData.mission;
         let nextStep = 0;
         
-        // Wenn keine Rätsel gelöst wurden, starte bei der Einführung (Schritt 0)
-        if (completedPuzzles.length === 0) {
-          nextStep = 0;
-        } else {
-          // Suche nach dem nächsten ungelösten Rätsel
-          for (let i = 0; i < mission.steps.length; i++) {
-            const step = mission.steps[i];
-            console.log(`Prüfe Schritt ${i}: ${step.title}, puzzleId: ${step.puzzleId}, gelöst: ${puzzleProgressMap[step.puzzleId]}`);
-            if (step.puzzleId && !puzzleProgressMap[step.puzzleId]) {
-              nextStep = i;
-              break;
-            }
+        // Sammle alle Rätsel-IDs der aktuellen Mission
+        const missionPuzzleIds = mission.steps
+          .filter((step: MissionStep) => step.puzzleId)
+          .map((step: MissionStep) => step.puzzleId);
+        
+        console.log('Mission Puzzle IDs:', missionPuzzleIds);
+        
+        // Prüfe, welche Rätsel dieser Mission bereits gelöst sind
+        const completedMissionPuzzles = missionPuzzleIds.filter((puzzleId: string | undefined) => 
+          puzzleId && puzzleProgressMap[puzzleId]
+        );
+        
+        console.log('Gelöste Mission-Rätsel:', completedMissionPuzzles);
+        
+        // Starte beim ersten Rätsel (keine Einführung mehr)
+        for (let i = 0; i < mission.steps.length; i++) {
+          const step = mission.steps[i];
+          if (step.type === 'puzzle' || step.type === 'terminal') {
+            nextStep = i;
+            break;
           }
-          
-          // Wenn alle Rätsel gelöst sind, setze auf den letzten Schritt
-          if (nextStep === 0 && completedPuzzles.length > 0) {
-            nextStep = mission.steps.length - 1;
+        }
+        
+        // Suche nach dem nächsten ungelösten Rätsel dieser Mission
+        for (let i = nextStep; i < mission.steps.length; i++) {
+          const step = mission.steps[i];
+          console.log(`Prüfe Schritt ${i}: ${step.title}, puzzleId: ${step.puzzleId}, gelöst: ${puzzleProgressMap[step.puzzleId]}`);
+          if (step.puzzleId && !puzzleProgressMap[step.puzzleId]) {
+            nextStep = i;
+            break;
           }
+        }
+        
+        // Wenn alle Rätsel dieser Mission gelöst sind, setze auf den letzten Schritt
+        if (nextStep === 0 && completedMissionPuzzles.length > 0 && completedMissionPuzzles.length === missionPuzzleIds.length) {
+          nextStep = mission.steps.length - 1;
         }
         
         setCurrentStep(nextStep);
@@ -307,16 +331,31 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
               
               {/* Fortschritts-Anzeige */}
               <div className="mb-4">
-                <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-                  <span>Fortschritt: {Object.keys(puzzleProgress).length} von {mission.steps.filter(step => step.puzzleId).length} Rätseln gelöst</span>
-                  <span>{Math.round((Object.keys(puzzleProgress).length / mission.steps.filter(step => step.puzzleId).length) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(Object.keys(puzzleProgress).length / mission.steps.filter(step => step.puzzleId).length) * 100}%` }}
-                  ></div>
-                </div>
+                {(() => {
+                  // Berechne Fortschritt nur für die aktuelle Mission
+                  const missionPuzzleSteps = mission.steps.filter(step => step.puzzleId);
+                  const completedMissionPuzzles = missionPuzzleSteps.filter(step => 
+                    step.puzzleId && puzzleProgress[step.puzzleId]
+                  );
+                  const progressPercentage = missionPuzzleSteps.length > 0 
+                    ? Math.round((completedMissionPuzzles.length / missionPuzzleSteps.length) * 100)
+                    : 0;
+                  
+                  return (
+                    <>
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                        <span>Fortschritt: {completedMissionPuzzles.length} von {missionPuzzleSteps.length} Rätseln gelöst</span>
+                        <span>{progressPercentage}%</span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${progressPercentage}%` }}
+                        ></div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </DialogHeader>
             
@@ -331,32 +370,38 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
               
               {/* Zeige alle Schritte mit Status */}
               <div className="mb-4 space-y-2">
-                {mission.steps.map((step, index) => (
-                  <div 
-                    key={step.id} 
-                    className={`flex items-center text-sm p-2 rounded ${
-                      index === currentStep 
-                        ? 'bg-blue-900/30 border border-blue-500' 
-                        : index < currentStep 
-                        ? 'bg-green-900/30 border border-green-500' 
-                        : 'bg-gray-800/30 border border-gray-600'
-                    }`}
-                  >
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2
-                      {index < currentStep 
-                        ? 'bg-green-500 text-black' 
-                        : index === currentStep 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-600 text-gray-300'
-                      }">
-                      {index < currentStep ? '✓' : index + 1}
-                    </span>
-                    <span className="flex-1">{step.title}</span>
-                    {step.puzzleId && puzzleProgress[step.puzzleId] && (
-                      <span className="text-green-400 text-xs">Gelöst</span>
-                    )}
-                  </div>
-                ))}
+                {mission.steps.map((step, index) => {
+                  const displayIndex = index + 1;
+                  const isCompleted = step.puzzleId && puzzleProgress[step.puzzleId];
+                  const isCurrent = index === currentStep;
+                  
+                  return (
+                    <div 
+                      key={step.id} 
+                      className={`flex items-center text-sm p-2 rounded ${
+                        isCurrent
+                          ? 'bg-blue-900/30 border border-blue-500' 
+                          : isCompleted
+                          ? 'bg-green-900/30 border border-green-500' 
+                          : 'bg-gray-800/30 border border-gray-600'
+                      }`}
+                    >
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2
+                        ${isCompleted
+                          ? 'bg-green-500 text-black' 
+                          : isCurrent
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-gray-600 text-gray-300'
+                        }`}>
+                        {isCompleted ? '✓' : displayIndex}
+                      </span>
+                      <span className="flex-1">{step.title}</span>
+                      {isCompleted && (
+                        <span className="text-green-400 text-xs">Gelöst</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               
               {(mission.steps[currentStep].type === 'puzzle' || mission.steps[currentStep].type === 'terminal') && mission.steps[currentStep].puzzleId && (

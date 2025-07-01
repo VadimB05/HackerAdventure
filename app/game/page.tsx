@@ -4,6 +4,7 @@ import GameLayout from "@/components/game/game-layout"
 import { GameProvider } from "@/components/game/game-context"
 import IntroStory from "@/components/game/intro-story"
 import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 export default function GamePage() {
   const searchParams = useSearchParams();
@@ -13,6 +14,9 @@ export default function GamePage() {
   const exp = searchParams.get('exp') || '0';
   const level = searchParams.get('level') || '1';
   const mission = searchParams.get('mission');
+  
+  const [showIntroStory, setShowIntroStory] = useState(false);
+  const [introModalCompleted, setIntroModalCompleted] = useState(false);
 
   return (
     <GameProvider 
@@ -23,8 +27,8 @@ export default function GamePage() {
       initialLevel={parseInt(level)}
       initialMission={mission}
     >
-      <GameLayout />
-      <IntroStory />
+      <GameLayout onIntroModalComplete={() => setShowIntroStory(true)} />
+      {showIntroStory && <IntroStory />}
     </GameProvider>
   )
 } 

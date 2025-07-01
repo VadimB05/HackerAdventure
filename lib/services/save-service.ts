@@ -3,7 +3,7 @@
  */
 
 export interface SaveEvent {
-  type: 'puzzle_solved' | 'mission_completed' | 'room_entered' | 'item_collected' | 'manual_save' | 'game_started';
+  type: 'puzzle_solved' | 'mission_completed' | 'room_entered' | 'item_collected' | 'manual_save' | 'game_started' | 'intro_modal_completed';
   data: any;
   timestamp: string;
 }

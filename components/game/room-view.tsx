@@ -34,6 +34,8 @@ interface InteractiveObject {
   requiredItems?: string[]; // Array von Item-IDs die benötigt werden
   // Exit-spezifische Felder
   exit_room_id?: string; // Ziel-Raum für Exit-Objekte
+  // Puzzle-spezifische Felder
+  puzzleId?: string; // Verknüpfung zu Rätsel
 }
 
 interface RoomViewProps {
@@ -101,6 +103,8 @@ export default function RoomView({
   // Mission Modal State
   const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
   const [missionCompleted, setMissionCompleted] = useState<boolean | undefined>(undefined);
+  const [currentMissionId, setCurrentMissionId] = useState<string>("mission1_crypto_bank");
+  const [completedMissions, setCompletedMissions] = useState<Set<string>>(new Set());
 
   // City Mission Status State
   const [cityMissionStatus, setCityMissionStatus] = useState<{
@@ -116,6 +120,9 @@ export default function RoomView({
       completedAt: string | null;
     }>;
   } | null>(null);
+
+  // Room Objects State
+  const [roomObjects, setRoomObjects] = useState<InteractiveObject[]>([]);
 
   // Cleanup Timer beim Unmount
   React.useEffect(() => {
@@ -189,34 +196,38 @@ export default function RoomView({
     }
   };
 
-  // Prüfen ob die erste Mission abgeschlossen ist
+  // Prüfen ob Missionen abgeschlossen sind
   const checkMissionCompletion = async () => {
     try {
-      // TODO: Echte User-ID verwenden
-      const userId = 1;
+      const response = await fetch('/api/game/progress');
+      const data = await response.json();
       
-      // Prüfen ob Mission 1 (tutorial) abgeschlossen ist
-      // Verwende roomId 'intro' für die Tutorial-Mission
-      const response = await fetch(`/api/game/progress/mission`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          userId: userId,
-          roomId: 'intro' // Verwende roomId statt missionId
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMissionCompleted(data.isCompleted);
+      if (data.success) {
+        const missionProgress = data.progress.missionProgress;
+        
+        // Sammle alle abgeschlossenen Missionen
+        const completed = new Set<string>();
+        missionProgress.forEach((m: any) => {
+          if (m.isCompleted) {
+            completed.add(m.missionId);
+          }
+        });
+        
+        setCompletedMissions(completed);
+        
+        // Spezielle Behandlung für Mission 1 (für Kompatibilität)
+        const mission1Progress = missionProgress.find((m: any) => m.missionId === 'mission1_crypto_bank');
+        if (mission1Progress) {
+          setMissionCompleted(mission1Progress.isCompleted);
+        } else {
+          setMissionCompleted(false);
         }
+        
+        console.log('Completed missions:', Array.from(completed));
       }
     } catch (error) {
-      console.error('Fehler beim Prüfen der Mission:', error);
+      console.error('Error checking mission completion:', error);
+      setMissionCompleted(false);
     }
   };
 
@@ -371,6 +382,9 @@ export default function RoomView({
         // Item aus Raum-Items entfernen
         setRoomItems(prev => prev.filter(roomItem => roomItem.id !== item.id));
 
+        // Item-Objekt aus Raumobjekten entfernen (falls vorhanden)
+        setRoomObjects(prev => prev.filter(obj => obj.id !== item.id));
+
         // Eventuell Raum-Objekte aktualisieren (falls Item Teil eines Rätsels war)
         // Hier könnte Logik für Rätsel-Entwicklung implementiert werden
 
@@ -439,13 +453,22 @@ export default function RoomView({
     
     return {
       ...obj,
-      // Feldzuordnung korrigieren
-      type: obj.type || obj.object_type || 'item', // Fallback zu 'item' wenn kein Typ definiert
+      // Feldzuordnung korrigieren - API gibt 'type' zurück, nicht 'object_type'
+      type: obj.type || 'item', // API gibt bereits 'type' zurück
       exit_room_id: obj.exitRoomId || obj.exit_room_id,
+      puzzleId: obj.puzzleId, // Puzzle-ID übernehmen
       isVisible: isVisible && obj.isVisible !== false,
       isInteractable: isInteractable && obj.isInteractable !== false
     };
   }) || [];
+
+  // Filter für sichtbare Objekte: Items nur anzeigen, wenn sie in roomItems existieren
+  const visibleObjects = interactiveObjects.filter(obj => {
+    if (obj.type === 'item') {
+      return roomItems.some(item => item.id === obj.id);
+    }
+    return true;
+  });
 
   // Drag-and-Drop Handler
   const handleDragStart = (item: InventoryItem, event: React.DragEvent) => {
@@ -613,13 +636,24 @@ export default function RoomView({
   };
 
   // Objekt-Klick-Handler
-  const handleObjectClick = (object: InteractiveObject) => {
+  const handleObjectClick = async (object: InteractiveObject) => {
     console.log('Object clicked:', object.id, object.type);
-    
+
     if (!object.isInteractable) {
       return;
     }
-    
+
+    // Fenster immer Popup öffnen
+    if (object.id === 'window') {
+      setIsWindowPopupOpen(true);
+      return;
+    }
+    // Smartphone immer Overlay öffnen
+    if (object.id === 'smartphone') {
+      setIsSmartphoneOpen(true);
+      return;
+    }
+
     // Prüfen ob es ein aufhebbares Item ist
     const roomItem = roomItems.find(item => item.id === object.id);
     if (roomItem) {
@@ -629,8 +663,37 @@ export default function RoomView({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2
       } : { x: 50, y: 50 };
-      
       handlePickItem(roomItem, position);
+      return;
+    }
+
+    // Prüfen ob es ein Item-Objekt ist (object.type === 'item')
+    if (object.type === 'item') {
+      console.log('Item object clicked:', object.id);
+      
+      // Versuche das Item aus roomItems zu finden
+      let itemToPick = roomItems.find(item => item.id === object.id);
+      
+      if (!itemToPick) {
+        // Wenn nicht in roomItems gefunden, erstelle ein Mock-Item basierend auf dem Objekt
+        itemToPick = {
+          id: object.id,
+          name: object.name,
+          type: 'tool', // Default type
+          quantity: 1,
+          description: object.description,
+          rarity: 'common',
+          value: 0
+        };
+      }
+      
+      const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
+      const position = rect ? {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      } : { x: 50, y: 50 };
+      
+      handlePickItem(itemToPick, position);
       return;
     }
     
@@ -670,54 +733,56 @@ export default function RoomView({
       return;
     }
     
+    // Puzzle-Objekte behandeln
+    if (object.type === 'puzzle') {
+      // Mission-Logik NUR für Computer/Server-Computer
+      if (object.id === 'computer' || object.id === 'server_computer') {
+        // ... Mission-Logik wie bisher ...
+        let missionId = "mission1_crypto_bank"; // Fallback
+        if (roomId === 'building1_server_farm') {
+          missionId = "mission2_server_farm";
+        } else if (roomId === 'building2_office') {
+          missionId = "mission3_office";
+        } else if (roomId === 'building3_lab') {
+          missionId = "mission4_lab";
+        } else if (roomId === 'building4_warehouse') {
+          missionId = "mission5_warehouse";
+        } else if (roomId === 'building5_penthouse') {
+          missionId = "mission6_penthouse";
+        }
+        if (completedMissions.size === 0) {
+          await checkMissionCompletion();
+        }
+        const isCurrentMissionCompleted = completedMissions.has(missionId);
+        if (isCurrentMissionCompleted) {
+          const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
+          const position = rect ? {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          } : { x: 50, y: 50 };
+          showFeedbackWithTimer({
+            isValid: true,
+            message: 'Hier ist gerade nichts zu tun',
+            position: position
+          });
+        } else {
+          setCurrentMissionId(missionId);
+          setIsMissionModalOpen(true);
+        }
+        return;
+      }
+      // Sonstige Puzzle-Objekte: Standard-Logik oder onObjectClick-Callback
+      onObjectClick?.(object);
+      return;
+    }
+    
     // Verbinde mit den vorhandenen Komponenten
     switch (object.id) {
-      case 'computer':
-        // Asynchron prüfen ob Mission abgeschlossen ist
-        handleComputerClick(object);
-        break;
-      case 'smartphone':
-        console.log('Opening smartphone overlay');
-        setIsSmartphoneOpen(true);
-        break;
-      case 'window':
-        console.log('Opening window popup');
-        setIsWindowPopupOpen(true);
-        break;
       case 'door':
-        console.log('Opening door popup');
         setIsDoorPopupOpen(true);
         break;
       default:
         onObjectClick?.(object);
-    }
-  };
-
-  // Asynchrone Computer-Klick-Behandlung
-  const handleComputerClick = async (object: InteractiveObject) => {
-    // Erst prüfen ob Mission-Status bereits geladen ist
-    if (missionCompleted === undefined) {
-      // Mission-Status noch nicht geladen - jetzt laden
-      await checkMissionCompletion();
-    }
-    
-    // Jetzt entscheiden basierend auf dem aktuellen Status
-    if (missionCompleted) {
-      // Mission ist abgeschlossen - zeige "Hier ist gerade nichts zu tun" am Computer
-      const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
-      const position = rect ? {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
-      } : { x: 50, y: 50 };
-      
-      showFeedbackWithTimer({
-        isValid: true,
-        message: 'Hier ist gerade nichts zu tun',
-        position: position
-      });
-    } else {
-      // Mission ist noch nicht abgeschlossen - öffne Modal
-      setIsMissionModalOpen(true);
     }
   };
 
@@ -860,7 +925,7 @@ export default function RoomView({
 
       {/* Interaktive Objekte */}
       <div className="absolute inset-0">
-        {interactiveObjects.map((object) => (
+        {visibleObjects.map((object) => (
           <motion.div
             key={object.id}
             initial={{ opacity: 0, scale: 0.8 }}
@@ -908,6 +973,7 @@ export default function RoomView({
                 {object.icon === 'ArrowRight' && <ArrowRight className="h-6 w-6" />}
                 {object.icon === 'Home' && <MapPinIcon className="h-6 w-6" />}
                 {object.icon === 'Building' && <Server className="h-6 w-6" />}
+                {object.icon === 'Monitor' && <Monitor className="h-6 w-6" />}
               </div>
               
               {/* Status-Badge */}
@@ -1217,12 +1283,15 @@ export default function RoomView({
 
       {/* Mission Modal */}
       <GuidedMissionModal
-        missionId="mission1_crypto_bank"
+        missionId={currentMissionId}
         isOpen={isMissionModalOpen}
         onClose={() => setIsMissionModalOpen(false)}
-        onMissionComplete={() => {
+        onMissionComplete={async () => {
           setMissionCompleted(true);
           setIsMissionModalOpen(false);
+          
+          // Mission-Status sofort aktualisieren
+          await checkMissionCompletion();
         }}
       />
     </div>

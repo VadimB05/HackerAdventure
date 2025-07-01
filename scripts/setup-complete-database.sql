@@ -632,7 +632,8 @@ INSERT INTO items (item_id, name, description, item_type, rarity, value, is_stac
 ('usb_stick', 'USB-Stick', 'Ein USB-Stick mit unbekanntem Inhalt', 'tool', 'uncommon', 0.00050000, TRUE, 10),
 ('keycard', 'Zugangskarte', 'Eine magnetische Zugangskarte', 'key', 'rare', 0.00200000, FALSE, 1),
 ('hacking_manual', 'Hacking-Handbuch', 'Ein detailliertes Handbuch für ethisches Hacking', 'document', 'uncommon', 0.00075000, FALSE, 1),
-('energy_drink', 'Energy Drink', 'Gibt dir Energie für längere Hacking-Sessions', 'consumable', 'common', 0.00005000, TRUE, 20)
+('energy_drink', 'Energy Drink', 'Gibt dir Energie für längere Hacking-Sessions', 'consumable', 'common', 0.00005000, TRUE, 20),
+('server_farm_usb', 'Server Farm USB-Stick', 'Ein USB-Stick mit wertvollen Server-Daten. Enthält möglicherweise sensible Informationen.', 'tool', 'rare', 0.00300000, FALSE, 1)
 ON DUPLICATE KEY UPDATE 
     name = VALUES(name),
     description = VALUES(description),
@@ -647,9 +648,118 @@ INSERT INTO room_items (room_id, item_id, quantity) VALUES
 ('intro', 'laptop', 1),
 ('intro', 'usb_stick', 1),
 ('intro', 'hacking_manual', 1),
-('intro', 'keycard', 1)
+('intro', 'keycard', 1),
+('building1_server_farm', 'server_farm_usb', 1)
 ON DUPLICATE KEY UPDATE 
     quantity = VALUES(quantity);
+
+-- ========================================
+-- RÄTSEL FÜR SERVER FARM MISSION (Building 1)
+-- ========================================
+
+-- Rätsel 1: Multiple Choice - Firewall-Regeln
+INSERT INTO puzzles (puzzle_id, room_id, name, description, puzzle_type, difficulty, solution, hints, max_attempts, is_required) VALUES
+('puzzle_mc_firewall_rules', 'building1_server_farm', 'Firewall-Regeln', 'Welche Firewall-Regel blockiert SSH-Zugang auf Port 22?', 'multiple_choice', 2, 
+'["iptables -A INPUT -p tcp --dport 22 -j DROP"]', 
+'["Tipp: Es ist eine iptables-Regel", "Tipp: DROP bedeutet blockieren"]', 
+3, TRUE)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    puzzle_type = VALUES(puzzle_type),
+    difficulty = VALUES(difficulty),
+    solution = VALUES(solution),
+    hints = VALUES(hints),
+    max_attempts = VALUES(max_attempts),
+    is_required = VALUES(is_required);
+
+-- Multiple Choice Daten für Firewall-Regeln
+INSERT INTO puzzle_data (puzzle_id, data_type, data_key, data_value) VALUES
+('puzzle_mc_firewall_rules', 'multiple_choice', 'question', '"Welche Firewall-Regel blockiert SSH-Zugang auf Port 22?"'),
+('puzzle_mc_firewall_rules', 'multiple_choice', 'options', '["iptables -A INPUT -p tcp --dport 22 -j DROP", "iptables -A INPUT -p tcp --dport 22 -j ACCEPT", "iptables -A OUTPUT -p tcp --dport 22 -j DROP", "iptables -A FORWARD -p tcp --dport 22 -j DROP"]'),
+('puzzle_mc_firewall_rules', 'multiple_choice', 'correct_answer', '"iptables -A INPUT -p tcp --dport 22 -j DROP"'),
+('puzzle_mc_firewall_rules', 'multiple_choice', 'explanation', '"Diese Regel blockiert eingehende TCP-Verbindungen auf Port 22 (SSH) und verwirft sie."')
+ON DUPLICATE KEY UPDATE 
+    data_value = VALUES(data_value);
+
+-- Rätsel 2: Code-Rätsel - Server-Passwort Hash
+INSERT INTO puzzles (puzzle_id, room_id, name, description, puzzle_type, difficulty, solution, hints, max_attempts, is_required) VALUES
+('puzzle_code_server_hash', 'building1_server_farm', 'Server-Passwort Hash', 'Das Server-System verwendet MD5. Berechne den Hash von "server123".', 'code', 2, 
+'["8a16a6b70505eb1f1ff7cdc0cd5559a7"]', 
+'["Tipp: MD5 von server123", "Tipp: Verwende einen Online-MD5-Generator"]', 
+5, TRUE)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    puzzle_type = VALUES(puzzle_type),
+    difficulty = VALUES(difficulty),
+    solution = VALUES(solution),
+    hints = VALUES(hints),
+    max_attempts = VALUES(max_attempts),
+    is_required = VALUES(is_required);
+
+-- Code-Rätsel Daten für Server-Hash
+INSERT INTO puzzle_data (puzzle_id, data_type, data_key, data_value) VALUES
+('puzzle_code_server_hash', 'code', 'code_snippet', '"// Server-System Login\\n// Passwort-Hash: 8a16a6b70505eb1f1ff7cdc0cd5559a7\\n// Finde das ursprüngliche Passwort\\nfunction verifyPassword(input) {\\n    const hash = md5(input);\\n    return hash === \\"8a16a6b70505eb1f1ff7cdc0cd5559a7\\";\\n}"'),
+('puzzle_code_server_hash', 'code', 'expected_input', '"8a16a6b70505eb1f1ff7cdc0cd5559a7"'),
+('puzzle_code_server_hash', 'code', 'case_sensitive', 'false'),
+('puzzle_code_server_hash', 'code', 'allow_partial', 'false'),
+('puzzle_code_server_hash', 'code', 'language', '"javascript"')
+ON DUPLICATE KEY UPDATE 
+    data_value = VALUES(data_value);
+
+-- Rätsel 3: Terminal-Rätsel - Server-Scan
+INSERT INTO puzzles (puzzle_id, room_id, name, description, puzzle_type, difficulty, solution, hints, max_attempts, is_required) VALUES
+('puzzle_terminal_server_scan', 'building1_server_farm', 'Server-Netzwerk scannen', 'Scanne das Server-Netzwerk nach offenen Ports. Verwende nmap für Port 80 (HTTP).', 'terminal_command', 2, 
+'["nmap -p 80 10.0.0.50"]', 
+'["Tipp: nmap für Port 80", "Tipp: Die Server-IP ist 10.0.0.50"]', 
+3, TRUE)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    puzzle_type = VALUES(puzzle_type),
+    difficulty = VALUES(difficulty),
+    solution = VALUES(solution),
+    hints = VALUES(hints),
+    max_attempts = VALUES(max_attempts),
+    is_required = VALUES(is_required);
+
+-- Terminal Command Daten für Server-Scan
+INSERT INTO puzzle_data (puzzle_id, data_type, data_key, data_value) VALUES
+('puzzle_terminal_server_scan', 'terminal', 'allowed_commands', '["nmap -p 80 10.0.0.50", "nmap 10.0.0.50", "nmap -p 80,443,22 10.0.0.50"]'),
+('puzzle_terminal_server_scan', 'terminal', 'expected_output', '"Starting Nmap 7.80\\nNmap scan report for 10.0.0.50\\nPORT   STATE SERVICE\\n80/tcp open  http\\nNmap done: 1 IP address (1 host up) scanned in 0.05 seconds"'),
+('puzzle_terminal_server_scan', 'terminal', 'command', '"nmap -p 80 10.0.0.50"'),
+('puzzle_terminal_server_scan', 'terminal', 'working_directory', '"/home/hacker"'),
+('puzzle_terminal_server_scan', 'terminal', 'file_system', '{"nmap": "nmap executable", "tools": "directory"}')
+ON DUPLICATE KEY UPDATE 
+    data_value = VALUES(data_value);
+
+-- ========================================
+-- RAUM-OBJEKTE FÜR BUILDING1_SERVER_FARM
+-- ========================================
+
+-- Raum-Objekte für building1_server_farm (3 Objekte: Computer, USB-Stick, Exit)
+INSERT INTO room_objects (room_id, object_id, name, description, object_type, x_position, y_position, width, height, icon, exit_room_id, puzzle_id, compatible_items, required_items, required_missions_completed) VALUES
+-- Computer-Objekt (Rätsel)
+('building1_server_farm', 'server_computer', 'Server-Computer', 'Ein Hochleistungs-Server mit wertvollen Daten. Hier kannst du die Server-Sicherheit testen.', 'puzzle', 25.0, 40.0, 20.0, 15.0, 'Monitor', NULL, 'puzzle_mc_firewall_rules', '["laptop", "usb_stick", "hacking_manual"]', '[]', FALSE),
+-- USB-Stick (aufhebbares Item)
+('building1_server_farm', 'server_farm_usb', 'Server Farm USB-Stick', 'Ein USB-Stick mit wertvollen Server-Daten. Enthält möglicherweise sensible Informationen.', 'item', 60.0, 40.0, 12.0, 8.0, 'Package', NULL, NULL, '[]', '[]', FALSE),
+-- Exit (zurück zur Stadt)
+('building1_server_farm', 'exit_to_city', 'Zurück zur Stadt', 'Zurück zur Stadtansicht. Hier kannst du andere Gebäude erkunden.', 'exit', 85.0, 20.0, 12.0, 18.0, 'DoorOpen', 'city1', NULL, '["keycard"]', '[]', FALSE)
+ON DUPLICATE KEY UPDATE 
+    name = VALUES(name),
+    description = VALUES(description),
+    object_type = VALUES(object_type),
+    x_position = VALUES(x_position),
+    y_position = VALUES(y_position),
+    width = VALUES(width),
+    height = VALUES(height),
+    icon = VALUES(icon),
+    exit_room_id = VALUES(exit_room_id),
+    puzzle_id = VALUES(puzzle_id),
+    compatible_items = VALUES(compatible_items),
+    required_items = VALUES(required_items),
+    required_missions_completed = VALUES(required_missions_completed);
 
 -- ========================================
 -- TEST-USER ERSTELLEN
@@ -684,7 +794,8 @@ ON DUPLICATE KEY UPDATE
 
 -- Test-Mission-Progress
 INSERT INTO mission_progress (user_id, mission_id, is_completed, puzzles_completed, rooms_visited) VALUES
-(1, 'mission1_crypto_bank', FALSE, 0, 1)
+(1, 'mission1_crypto_bank', FALSE, 0, 1),
+(1, 'mission2_server_farm', FALSE, 0, 0)
 ON DUPLICATE KEY UPDATE 
     is_completed = VALUES(is_completed),
     puzzles_completed = VALUES(puzzles_completed),
@@ -694,7 +805,10 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO puzzle_progress (user_id, puzzle_id, is_completed, attempts, hints_used) VALUES
 (1, 'puzzle_mc_bank_security', FALSE, 0, 0),
 (1, 'puzzle_code_bank_password', FALSE, 0, 0),
-(1, 'puzzle_terminal_bank_scan', FALSE, 0, 0)
+(1, 'puzzle_terminal_bank_scan', FALSE, 0, 0),
+(1, 'puzzle_mc_firewall_rules', FALSE, 0, 0),
+(1, 'puzzle_code_server_hash', FALSE, 0, 0),
+(1, 'puzzle_terminal_server_scan', FALSE, 0, 0)
 ON DUPLICATE KEY UPDATE 
     is_completed = VALUES(is_completed),
     attempts = VALUES(attempts),

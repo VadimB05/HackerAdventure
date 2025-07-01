@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
-import { executeQuerySingle, executeUpdate, executeQuery } from '@/lib/database';
+import { executeQuerySingle, executeUpdate, executeQuery, connectDB } from '@/lib/database';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Item aufsammeln
@@ -12,6 +13,7 @@ import { executeQuerySingle, executeUpdate, executeQuery } from '@/lib/database'
  */
 export async function POST(request: NextRequest) {
   return requireAuth(async (req) => {
+    const db = await connectDB();
     try {
       const userId = req.user!.id;
       const { itemId, roomId } = await request.json();
@@ -76,8 +78,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Transaktion starten
-      await executeUpdate('START TRANSACTION');
-
+      await db.query('START TRANSACTION');
       try {
         if (existingInventoryItem) {
           // Item bereits vorhanden - Menge erhöhen (falls stapelbar)
@@ -86,12 +87,12 @@ export async function POST(request: NextRequest) {
               existingInventoryItem.quantity + roomItem.quantity,
               itemDetails.max_stack_size
             );
-            
             await executeUpdate(
               'UPDATE player_inventory SET quantity = ? WHERE user_id = ? AND item_id = ?',
               [newQuantity, userId, itemId]
             );
           } else {
+            await db.query('ROLLBACK');
             return NextResponse.json({
               success: false,
               error: 'Item bereits im Inventar vorhanden und nicht stapelbar'
@@ -111,8 +112,67 @@ export async function POST(request: NextRequest) {
           [roomId, itemId]
         );
 
+        // Automatischen Savepoint erstellen für Item-Sammlung
+        try {
+          // Aktuellen Spielstand abrufen
+          const gameState = await executeQuerySingle<{
+            id: number;
+            current_room: string;
+            inventory: string;
+            progress: string;
+            bitcoins: number;
+            experience_points: number;
+            level: number;
+            current_mission: string | null;
+          }>(
+            'SELECT * FROM game_states WHERE user_id = ?',
+            [userId]
+          );
+
+          if (gameState) {
+            // Savepoint-ID generieren
+            const saveId = uuidv4();
+            const timestamp = new Date().toISOString();
+
+            // Savepoint in der Datenbank erstellen
+            await executeUpdate(
+              `INSERT INTO save_points (
+                save_id, user_id, event_type, event_data, game_state_snapshot, 
+                is_auto_save, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                saveId,
+                userId,
+                'item_collected',
+                JSON.stringify({
+                  itemId: itemId,
+                  itemName: itemDetails.name,
+                  roomId: roomId,
+                  quantity: roomItem.quantity
+                }),
+                JSON.stringify({
+                  currentRoom: gameState.current_room,
+                  inventory: JSON.parse(gameState.inventory || '[]'),
+                  progress: JSON.parse(gameState.progress || '{}'),
+                  bitcoins: gameState.bitcoins,
+                  experiencePoints: gameState.experience_points,
+                  level: gameState.level,
+                  currentMission: gameState.current_mission
+                }),
+                true, // Auto-Save
+                timestamp
+              ]
+            );
+
+            console.log(`Savepoint erstellt für Item-Sammlung: ${itemDetails.name}`);
+          }
+        } catch (saveError) {
+          // Savepoint-Fehler nicht kritisch - nur loggen
+          console.error('Fehler beim Erstellen des Savepoints:', saveError);
+        }
+
         // Transaktion bestätigen
-        await executeUpdate('COMMIT');
+        await db.query('COMMIT');
 
         // Aktualisiertes Inventar abrufen
         const updatedInventory = await executeQuery<{
@@ -138,36 +198,28 @@ export async function POST(request: NextRequest) {
         const formattedInventory = updatedInventory.map(item => ({
           id: item.item_id,
           name: item.name,
-          type: item.item_type,
-          quantity: item.quantity,
           description: item.description,
+          type: item.item_type,
           rarity: item.rarity,
           value: item.value,
           isStackable: item.is_stackable,
-          maxStackSize: item.max_stack_size
+          maxStackSize: item.max_stack_size,
+          quantity: item.quantity
         }));
 
         return NextResponse.json({
           success: true,
-          message: `${itemDetails.name} erfolgreich aufgesammelt`,
-          item: {
-            id: itemDetails.item_id,
-            name: itemDetails.name,
-            type: itemDetails.item_type,
-            quantity: roomItem.quantity,
-            description: itemDetails.description,
-            rarity: itemDetails.rarity
-          },
-          inventory: formattedInventory,
-          count: formattedInventory.length
-        }, { status: 201 });
-
-      } catch (error) {
-        // Transaktion rückgängig machen bei Fehler
-        await executeUpdate('ROLLBACK');
-        throw error;
+          message: `${itemDetails.name} aufgesammelt!`,
+          inventory: formattedInventory
+        });
+      } catch (err) {
+        await db.query('ROLLBACK');
+        console.error('Fehler beim Aufsammeln des Items:', err);
+        return NextResponse.json({
+          success: false,
+          error: 'Interner Serverfehler beim Aufsammeln des Items'
+        }, { status: 500 });
       }
-
     } catch (error) {
       console.error('Fehler beim Aufsammeln des Items:', error);
       return NextResponse.json({

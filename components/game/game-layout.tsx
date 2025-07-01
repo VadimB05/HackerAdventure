@@ -14,17 +14,71 @@ import TerminalMission from "./terminal-mission"
 import MoneyPopup from "./money-popup"
 import RoomView from "./room-view"
 import GameOverScreen from "./game-over-screen"
+import IntroModal from "./intro-modal"
 import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getInventory, type InventoryItem } from "@/lib/services/inventory-service"
 
-export default function GameLayout() {
+interface GameLayoutProps {
+  onIntroModalComplete?: () => void;
+}
+
+export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
   const { currentView, setCurrentView, bitcoinBalance } = useGameState()
   
   // Inventar-State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+  
+  // Aktueller Raum State
+  const [currentRoomId, setCurrentRoomId] = useState<string>("intro");
+  
+  // Intro Modal State
+  const [showIntroModal, setShowIntroModal] = useState(false);
+  const [introModalChecked, setIntroModalChecked] = useState(false);
+
+  // Prüfe IntroModal-Status beim Laden
+  useEffect(() => {
+    const checkIntroModal = async () => {
+      try {
+        const authResponse = await fetch('/api/auth/verify', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        if (!authResponse.ok) {
+          setShowIntroModal(true);
+          setIntroModalChecked(true);
+          return;
+        }
+        const authData = await authResponse.json();
+        if (!authData.user || !authData.user.id) {
+          setShowIntroModal(true);
+          setIntroModalChecked(true);
+          return;
+        }
+        const saveRes = await fetch(`/api/game/save?userId=${authData.user.id}`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+        if (!saveRes.ok) {
+          setShowIntroModal(true);
+          setIntroModalChecked(true);
+          return;
+        }
+        const saveData = await saveRes.json();
+        console.log('Save data for intro modal check:', saveData);
+        const found = saveData.savePoints && saveData.savePoints.some((sp: any) => sp.eventType === 'intro_modal_completed');
+        console.log('Found intro_modal_completed savepoint:', found);
+        setShowIntroModal(!found);
+        setIntroModalChecked(true);
+      } catch (e) {
+        setShowIntroModal(true);
+        setIntroModalChecked(true);
+      }
+    }
+    checkIntroModal();
+  }, []);
 
   // Inventar beim Laden abrufen
   useEffect(() => {
@@ -38,6 +92,7 @@ export default function GameLayout() {
     const initialRoom = urlParams.get('room');
     
     if (initialRoom) {
+      setCurrentRoomId(initialRoom);
       switch (initialRoom) {
         case "basement":
           setCurrentView("basement");
@@ -141,7 +196,8 @@ export default function GameLayout() {
       case "basement":
         return "basement";
       case "city":
-        return "city1"; // City-View zeigt city1
+        // Verwende den aktuellen Raum State für die City-View
+        return currentRoomId;
       default:
         return "intro";
     }
@@ -150,6 +206,9 @@ export default function GameLayout() {
   // Raumwechsel-Handler
   const handleRoomChange = (newRoomId: string) => {
     console.log('Room change requested to:', newRoomId);
+    
+    // Aktualisiere den aktuellen Raum State
+    setCurrentRoomId(newRoomId);
     
     // Bestimme die entsprechende View basierend auf dem neuen Raum
     switch (newRoomId) {
@@ -161,6 +220,14 @@ export default function GameLayout() {
         break;
       case "city1":
       case "city2":
+        setCurrentView("city");
+        break;
+      case "building1_server_farm":
+      case "building2_office":
+      case "building3_lab":
+      case "building4_warehouse":
+      case "building5_penthouse":
+        // Gebäude-Räume zeigen auch die City-View (da sie zu city1 gehören)
         setCurrentView("city");
         break;
       default:
@@ -242,6 +309,13 @@ export default function GameLayout() {
       </main>
 
       {/* Modals und Popups */}
+      <IntroModal 
+        isOpen={showIntroModal} 
+        onClose={() => {
+          setShowIntroModal(false);
+          onIntroModalComplete?.();
+        }} 
+      />
       <DecisionModal />
       <StoryPopup />
       <HackingMission />

@@ -35,23 +35,15 @@ export async function GET(request: NextRequest, context: { params: Promise<{ mis
 
     console.log('Steps found:', steps.length);
 
-    // Dynamische Schritte: Einleitung (Text) + alle Puzzles/Terminals
-    const missionSteps = [
-      {
-        id: 'intro',
-        type: 'text',
-        title: 'Einführung',
-        description: mission.description,
-      },
-      ...steps.map((puzzle: any) => ({
-        id: puzzle.puzzle_id,
-        type: puzzle.puzzle_type === 'terminal_command' ? 'terminal' : 'puzzle',
-        title: puzzle.name,
-        description: puzzle.description,
-        puzzleId: puzzle.puzzle_id,
-        roomId: puzzle.room_id,
-      })),
-    ];
+    // Dynamische Schritte: Nur Puzzles/Terminals (keine Einführung mehr)
+    const missionSteps = steps.map((puzzle: any) => ({
+      id: puzzle.puzzle_id,
+      type: puzzle.puzzle_type === 'terminal_command' ? 'terminal' : 'puzzle',
+      title: puzzle.name,
+      description: puzzle.description,
+      puzzleId: puzzle.puzzle_id,
+      roomId: puzzle.room_id,
+    }));
 
     console.log('Mission steps created:', missionSteps.length);
 
