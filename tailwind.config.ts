@@ -88,12 +88,12 @@ const config: Config = {
   				'0%, 100%': {
   					backgroundColor: 'transparent',
   					borderColor: 'rgb(34 197 94)',
-  					borderRadius: '20px'
+  					borderRadius: '8px'
   				},
   				'50%': {
-  					backgroundColor: 'rgba(239, 68, 68, 0.3)',
-  					borderColor: 'rgb(239, 68, 68)',
-  					borderRadius: '20px'
+  					backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  					borderColor: 'rgb(239 68 68)',
+  					borderRadius: '8px'
   				}
   			}
   		},

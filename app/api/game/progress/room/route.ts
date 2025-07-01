@@ -110,6 +110,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Prüfe ob alle Missionen in city1 abgeschlossen sind, bevor zu city2 gewechselt werden kann
+    if (roomId === 'city2') {
+      // Alle erforderlichen Missionen für city1 abrufen
+      const city1Missions = await executeQuery<{mission_id: string}>(
+        'SELECT mission_id FROM city_missions WHERE city_id = ? AND is_required = true',
+        ['city1']
+      );
+
+      if (city1Missions.length > 0) {
+        // Prüfe ob alle Missionen abgeschlossen sind
+        const missionIds = city1Missions.map(m => m.mission_id);
+        const completedMissions = await executeQuery<{mission_id: string}>(
+          `SELECT mission_id FROM mission_progress WHERE user_id = ? AND mission_id IN (${missionIds.map(() => '?').join(',')}) AND is_completed = true`,
+          [userId, ...missionIds]
+        );
+
+        if (completedMissions.length < city1Missions.length) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: 'Du musst zuerst alle Missionen in dieser Stadt abschließen, bevor du zur nächsten Stadt weitergehen kannst.' 
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     // Raumwechsel durchführen
     await executeQuery(
       'UPDATE game_states SET current_room = ?, current_mission = ? WHERE user_id = ?',

@@ -758,10 +758,13 @@ export default function RoomView({
         // Rotes Blinken für das Objekt
         const objectElement = document.querySelector(`[data-object-id="${exitId}"]`);
         if (objectElement) {
-          objectElement.classList.add('animate-red-blink');
-          setTimeout(() => {
-            objectElement.classList.remove('animate-red-blink');
-          }, 1000);
+          const iconElement = objectElement.querySelector('.bg-black\\/50');
+          if (iconElement) {
+            iconElement.classList.add('animate-red-blink');
+            setTimeout(() => {
+              iconElement.classList.remove('animate-red-blink');
+            }, 1000);
+          }
         }
       }
     } catch (error) {
