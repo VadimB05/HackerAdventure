@@ -23,8 +23,6 @@ interface PuzzleCardProps {
     difficulty: number;
     timeLimitSeconds?: number;
     maxAttempts: number;
-    rewardExp: number;
-    rewardBitcoins?: number;
     hints?: string[];
     isCompleted?: boolean;
   };
@@ -100,19 +98,6 @@ export default function PuzzleCard({ puzzle, onSelect, onSolve }: PuzzleCardProp
           </div>
         </div>
         
-        <div className="flex items-center justify-between text-sm mb-3">
-          <div className="flex items-center gap-1 text-yellow-400">
-            <Zap className="w-4 h-4" />
-            <span>+{puzzle.rewardExp} XP</span>
-          </div>
-          {puzzle.rewardBitcoins && (
-            <div className="flex items-center gap-1 text-orange-400">
-              <Bitcoin className="w-4 h-4" />
-              <span>+{puzzle.rewardBitcoins} BTC</span>
-            </div>
-          )}
-        </div>
-
         {puzzle.timeLimitSeconds && (
           <div className="flex items-center gap-1 text-sm text-blue-400 mb-3">
             <Clock className="w-4 h-4" />

@@ -31,13 +31,10 @@ export async function GET(
         hints: string;
         max_attempts: number;
         time_limit_seconds: number | null;
-        reward_bitcoins: number;
-        reward_exp: number;
-        reward_items: string;
         is_required: boolean;
         is_hidden: boolean;
       }>(
-        'SELECT * FROM puzzles WHERE puzzle_id = ?',
+        'SELECT id, puzzle_id, room_id, name, description, puzzle_type, difficulty, solution, hints, max_attempts, time_limit_seconds, is_required, is_hidden FROM puzzles WHERE puzzle_id = ?',
         [puzzleId]
       );
 
@@ -78,11 +75,29 @@ export async function GET(
           structuredData[row.data_type] = {};
         }
         try {
-          structuredData[row.data_type][row.data_key] = JSON.parse(row.data_value);
+          const parsedValue = JSON.parse(row.data_value);
+          structuredData[row.data_type][row.data_key] = parsedValue;
         } catch {
           structuredData[row.data_type][row.data_key] = row.data_value;
         }
       });
+
+      // Für Multiple Choice: Struktur an Frontend-Erwartung anpassen
+      if (structuredData.multiple_choice) {
+        // Stelle sicher, dass options ein Array ist
+        const options = structuredData.multiple_choice.options;
+        if (options && !Array.isArray(options)) {
+          console.error('Options ist kein Array:', options);
+          structuredData.multiple_choice.options = [];
+        }
+        
+        structuredData.multiple_choice = {
+          question: structuredData.multiple_choice.question || '',
+          options: Array.isArray(structuredData.multiple_choice.options) ? structuredData.multiple_choice.options : [],
+          correct_answer: structuredData.multiple_choice.correct_answer || '',
+          explanation: structuredData.multiple_choice.explanation || ''
+        };
+      }
 
       // Rätsel-Response zusammenstellen
       const puzzleResponse = {
@@ -96,9 +111,6 @@ export async function GET(
         hints: JSON.parse(puzzle.hints || '[]'),
         maxAttempts: puzzle.max_attempts,
         timeLimitSeconds: puzzle.time_limit_seconds,
-        rewardBitcoins: puzzle.reward_bitcoins,
-        rewardExp: puzzle.reward_exp,
-        rewardItems: JSON.parse(puzzle.reward_items || '[]'),
         isRequired: puzzle.is_required,
         isHidden: puzzle.is_hidden,
         data: structuredData,

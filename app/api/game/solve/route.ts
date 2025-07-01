@@ -15,9 +15,10 @@ interface SolveResponse {
   isCorrect: boolean;
   attempts: number;
   message: string;
-  rewardExp?: number;
-  rewardBitcoins?: number;
-  rewardItems?: string[];
+  // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+  // rewardExp?: number;
+  // rewardBitcoins?: number;
+  // rewardItems?: string[];
   unlockedRooms?: string[];
   unlockedItems?: string[];
   hints?: string[];
@@ -122,9 +123,10 @@ export async function POST(request: NextRequest) {
         isCorrect: true,
         attempts: currentProgress.attempts,
         message: 'Rätsel bereits gelöst',
-        rewardExp: puzzle.reward_exp,
-        rewardBitcoins: parseFloat(puzzle.reward_bitcoins || '0'),
-        rewardItems: JSON.parse(puzzle.reward_items || '[]')
+        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+        // rewardExp: puzzle.reward_exp,
+        // rewardBitcoins: parseFloat(puzzle.reward_bitcoins || '0'),
+        // rewardItems: JSON.parse(puzzle.reward_items || '[]')
       });
     }
 
@@ -159,15 +161,15 @@ export async function POST(request: NextRequest) {
         END
       `, [dbUser.id, puzzleId, newAttempts, timeSpent || null, newAttempts, timeSpent || 0, timeSpent || 0]);
 
-      // Belohnungen vergeben
-      await executeUpdate(`
-        UPDATE game_states 
-        SET 
-          experience_points = experience_points + ?,
-          bitcoins = bitcoins + ?,
-          progress = JSON_SET(progress, CONCAT('$.', ?), JSON_OBJECT('completed', TRUE, 'completed_at', NOW()))
-        WHERE user_id = ?
-      `, [puzzle.reward_exp || 0, parseFloat(puzzle.reward_bitcoins || '0'), puzzleId, dbUser.id]);
+      // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+      // await executeUpdate(`
+      //   UPDATE game_states 
+      //   SET 
+      //     experience_points = experience_points + ?,
+      //     bitcoins = bitcoins + ?,
+      //     progress = JSON_SET(progress, CONCAT('$.', ?), JSON_OBJECT('completed', TRUE, 'completed_at', NOW()))
+      //   WHERE user_id = ?
+      // `, [puzzle.reward_exp || 0, parseFloat(puzzle.reward_bitcoins || '0'), puzzleId, dbUser.id]);
 
       // Erfolgs-Response
       const response: SolveResponse = {
@@ -175,9 +177,10 @@ export async function POST(request: NextRequest) {
         isCorrect: true,
         attempts: newAttempts,
         message: 'Rätsel erfolgreich gelöst!',
-        rewardExp: puzzle.reward_exp,
-        rewardBitcoins: parseFloat(puzzle.reward_bitcoins || '0'),
-        rewardItems: JSON.parse(puzzle.reward_items || '[]')
+        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+        // rewardExp: puzzle.reward_exp,
+        // rewardBitcoins: parseFloat(puzzle.reward_bitcoins || '0'),
+        // rewardItems: JSON.parse(puzzle.reward_items || '[]')
       };
 
       return NextResponse.json(response);

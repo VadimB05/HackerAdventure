@@ -27,8 +27,6 @@ interface PuzzleMultipleChoiceProps {
     difficulty: number;
     maxAttempts: number;
     timeLimitSeconds?: number;
-    rewardMoney: number;
-    rewardExp: number;
     hints: string[];
     roomId?: string;
     data: {
@@ -255,30 +253,6 @@ export default function PuzzleMultipleChoice({
         if (data.isCorrect) {
           setIsCorrect(true);
           setShowResult(true);
-          
-          // Mission-Progress prüfen nach erfolgreichem Lösen
-          try {
-            const missionResponse = await fetch('/api/game/progress/mission', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                roomId: roomId
-              }),
-            });
-
-            const missionData = await missionResponse.json();
-            console.log(`[DEBUG] Mission Progress Response:`, missionData);
-
-            if (missionData.success && missionData.isCompleted) {
-              console.log(`[DEBUG] Mission abgeschlossen! Belohnungen:`, missionData.rewards);
-              // Hier könntest du eine Benachrichtigung anzeigen
-            }
-          } catch (missionError) {
-            console.error('Fehler beim Prüfen des Mission-Progress:', missionError);
-          }
           
           setTimeout(() => {
             onSolve(puzzleId, true);
@@ -531,8 +505,8 @@ export default function PuzzleMultipleChoice({
               </motion.div>
             )}
 
-            {/* Belohnungen */}
-            {showResult && isCorrect && (
+            {/* KEINE Rätsel-Belohnungen mehr anzeigen - nur Mission-Belohnungen */}
+            {/* {showResult && isCorrect && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -551,7 +525,7 @@ export default function PuzzleMultipleChoice({
                   </div>
                 )}
               </motion.div>
-            )}
+            )} */}
 
             {/* Aktionen */}
             <div className="flex justify-between items-center pt-4">

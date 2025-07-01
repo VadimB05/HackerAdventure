@@ -111,8 +111,9 @@ interface GameContextType {
   toggleTimeOfDay: () => void
   gameTime: number // Neue Spielzeit in Minuten
   bitcoinBalance: number
+  setBitcoinBalance: (balance: number) => void
   bitcoinRate: number
-  updateBitcoinBalance: (amount: number, message?: string) => void
+  updateBitcoinBalance: (amount: number, message?: string, skipBackend?: boolean) => void
   mentalState: MentalState
   setMentalState: (state: MentalState) => void
   terminalHistory: string[]
@@ -458,14 +459,15 @@ export function GameProvider({
   }
 
   // Funktion zum Hinzufügen einer Geld-Benachrichtigung
-  const addMoneyNotification = (amount: number, message: string) => {
+  const addMoneyNotification = (amount: number | string, message: string) => {
+    const safeAmount = Number(amount) || 0;
+    console.log("addMoneyNotification:", safeAmount, typeof safeAmount, message);
     const newNotification: MoneyNotification = {
       id: Date.now().toString(),
-      amount,
+      amount: safeAmount,
       message,
       timestamp: new Date().toISOString(),
     }
-
     setMoneyNotifications((prev) => [...prev, newNotification])
   }
 
@@ -475,33 +477,29 @@ export function GameProvider({
   }
 
   // Funktion zum Aktualisieren des Bitcoin-Guthabens mit optionaler Benachrichtigung
-  const updateBitcoinBalance = async (amount: number, message?: string) => {
-    const newBalance = bitcoinBalance + amount;
+  const updateBitcoinBalance = async (amount: number | string, message?: string, skipBackend = false) => {
+    const safeAmount = Number(amount) || 0;
+    const newBalance = bitcoinBalance + safeAmount;
     setBitcoinBalance(newBalance);
 
-    // Backend aktualisieren
-    try {
-      const response = await fetch('/api/game/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          bitcoins: newBalance
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Fehler beim Aktualisieren der Bitcoin-Balance im Backend');
+    if (!skipBackend) {
+      try {
+        const response = await fetch('/api/game/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ bitcoins: newBalance }),
+        });
+        if (!response.ok) {
+          console.error('Fehler beim Aktualisieren der Bitcoin-Balance im Backend');
+        }
+      } catch (error) {
+        console.error('Fehler beim Aktualisieren der Bitcoin-Balance:', error);
       }
-    } catch (error) {
-      console.error('Fehler beim Aktualisieren der Bitcoin-Balance:', error);
     }
 
-    // Wenn ein positiver Betrag und eine Nachricht vorhanden sind, zeige eine Benachrichtigung
-    if (amount > 0 && message) {
-      addMoneyNotification(amount, message)
+    if (safeAmount > 0 && message) {
+      addMoneyNotification(safeAmount, message)
     }
   }
 
@@ -576,36 +574,6 @@ export function GameProvider({
 
     loadBitcoinBalance();
   }, []);
-
-  // Bitcoin-Balance regelmäßig aus dem Backend aktualisieren
-  useEffect(() => {
-    const updateBitcoinBalanceFromBackend = async () => {
-      try {
-        const response = await fetch('/api/game/state', {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.gameState) {
-            const backendBalance = parseFloat(data.gameState.bitcoins) || 0;
-            // Nur aktualisieren, wenn sich der Wert geändert hat
-            if (Math.abs(backendBalance - bitcoinBalance) > 0.0001) {
-              setBitcoinBalance(backendBalance);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Fehler beim Aktualisieren der Bitcoin-Balance:', error);
-      }
-    };
-
-    // Alle 5 Sekunden aktualisieren
-    const interval = setInterval(updateBitcoinBalanceFromBackend, 5000);
-
-    return () => clearInterval(interval);
-  }, [bitcoinBalance]);
 
   const incrementDay = () => {
     setDay((prev) => prev + 1)
@@ -854,6 +822,7 @@ export function GameProvider({
     toggleTimeOfDay,
     gameTime,
     bitcoinBalance,
+    setBitcoinBalance,
     bitcoinRate,
     updateBitcoinBalance,
     mentalState,

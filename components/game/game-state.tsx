@@ -6,8 +6,12 @@ import { Bitcoin, TrendingUp, Clock, AlertTriangle, Info } from "lucide-react"
 export default function GameState() {
   const { day, timeOfDay, bitcoinBalance, bitcoinRate, gameTime, alarmLevel } = useGameState()
 
+  // Sichere Konvertierung zu Number
+  const safeBitcoinBalance = Number(bitcoinBalance) || 0
+  const safeBitcoinRate = Number(bitcoinRate) || 0
+
   // Berechne den Wert des Bitcoin-Guthabens in USD
-  const balanceInUsd = bitcoinBalance * bitcoinRate
+  const balanceInUsd = safeBitcoinBalance * safeBitcoinRate
 
   // Formatiere die Spielzeit als Uhrzeit
   const formatGameTime = (minutes: number) => {
@@ -65,11 +69,11 @@ export default function GameState() {
         </div>
         <div className="flex items-center">
           <Bitcoin className="h-4 w-4 mr-1" />
-          <span>{bitcoinBalance.toFixed(4)} BTC</span>
+          <span>{safeBitcoinBalance.toFixed(4)} BTC</span>
         </div>
         <div className="flex items-center">
           <TrendingUp className="h-4 w-4 mr-1" />
-          <span>${bitcoinRate.toLocaleString()}</span>
+          <span>${safeBitcoinRate.toLocaleString()}</span>
         </div>
         <div className="flex items-center text-green-400">
           <span>${balanceInUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>

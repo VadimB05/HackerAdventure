@@ -11,8 +11,6 @@ export interface PuzzleData {
   difficulty: number;
   maxAttempts: number;
   timeLimitSeconds?: number;
-  rewardMoney: number;
-  rewardExp: number;
   isRequired: boolean;
   isHidden: boolean;
   hints: string[];
@@ -37,11 +35,6 @@ export interface SolvePuzzleResponse {
   message: string;
   attempts: number;
   maxAttempts: number;
-  rewards?: {
-    money: number;
-    exp: number;
-    items: string[];
-  };
   error?: string;
 }
 
@@ -114,7 +107,6 @@ export async function solvePuzzle(puzzleId: string, request: SolvePuzzleRequest)
       message: data.message,
       attempts: data.attempts,
       maxAttempts: data.maxAttempts,
-      rewards: data.rewards
     };
   } catch (error) {
     console.error('Fehler beim Lösen des Rätsels:', error);

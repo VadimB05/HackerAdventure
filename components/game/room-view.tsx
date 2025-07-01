@@ -98,7 +98,7 @@ export default function RoomView({
 
   // Mission Modal State
   const [isMissionModalOpen, setIsMissionModalOpen] = useState(false);
-  const [missionCompleted, setMissionCompleted] = useState(false);
+  const [missionCompleted, setMissionCompleted] = useState<boolean | undefined>(undefined);
 
   // Cleanup Timer beim Unmount
   React.useEffect(() => {
@@ -114,7 +114,6 @@ export default function RoomView({
     loadRoomItems();
     loadGameProgress();
     loadAvailableExits();
-    checkMissionProgress(); // Mission-Progress beim Laden prüfen
   }, [roomId]);
 
   const loadRoomItems = async () => {
@@ -135,9 +134,43 @@ export default function RoomView({
       const result = await getGameProgress(userId);
       if (result.success && result.progress) {
         setGameProgress(result.progress);
+        
+        // Prüfen ob die erste Mission abgeschlossen ist
+        checkMissionCompletion();
       }
     } catch (error) {
       console.error('Fehler beim Laden des Spieler-Fortschritts:', error);
+    }
+  };
+
+  // Prüfen ob die erste Mission abgeschlossen ist
+  const checkMissionCompletion = async () => {
+    try {
+      // TODO: Echte User-ID verwenden
+      const userId = 1;
+      
+      // Prüfen ob Mission 1 (tutorial) abgeschlossen ist
+      // Verwende roomId 'intro' für die Tutorial-Mission
+      const response = await fetch(`/api/game/progress/mission`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: userId,
+          roomId: 'intro' // Verwende roomId statt missionId
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMissionCompleted(data.isCompleted);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Prüfen der Mission:', error);
     }
   };
 
@@ -526,22 +559,8 @@ export default function RoomView({
     // Verbinde mit den vorhandenen Komponenten
     switch (object.id) {
       case 'computer':
-        if (missionCompleted) {
-          // Mission ist abgeschlossen - zeige "Hier ist gerade nichts zu tun" am Computer
-          const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
-          const position = rect ? {
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2
-          } : { x: 50, y: 50 };
-          
-          showFeedbackWithTimer({
-            isValid: true,
-            message: 'Hier ist gerade nichts zu tun',
-            position: position
-          });
-        } else {
-          setIsMissionModalOpen(true);
-        }
+        // Asynchron prüfen ob Mission abgeschlossen ist
+        handleComputerClick(object);
         break;
       case 'smartphone':
         console.log('Opening smartphone overlay');
@@ -557,6 +576,34 @@ export default function RoomView({
         break;
       default:
         onObjectClick?.(object);
+    }
+  };
+
+  // Asynchrone Computer-Klick-Behandlung
+  const handleComputerClick = async (object: InteractiveObject) => {
+    // Erst prüfen ob Mission-Status bereits geladen ist
+    if (missionCompleted === undefined) {
+      // Mission-Status noch nicht geladen - jetzt laden
+      await checkMissionCompletion();
+    }
+    
+    // Jetzt entscheiden basierend auf dem aktuellen Status
+    if (missionCompleted) {
+      // Mission ist abgeschlossen - zeige "Hier ist gerade nichts zu tun" am Computer
+      const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
+      const position = rect ? {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      } : { x: 50, y: 50 };
+      
+      showFeedbackWithTimer({
+        isValid: true,
+        message: 'Hier ist gerade nichts zu tun',
+        position: position
+      });
+    } else {
+      // Mission ist noch nicht abgeschlossen - öffne Modal
+      setIsMissionModalOpen(true);
     }
   };
 
@@ -620,38 +667,6 @@ export default function RoomView({
         displayUnlockNotification(exit.unlockMessage);
       }
     });
-  };
-
-  // Mission-Progress prüfen
-  const checkMissionProgress = async () => {
-    try {
-      const response = await fetch('/api/game/progress/mission', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          roomId: roomId
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success && data.isCompleted) {
-        setMissionCompleted(true);
-      }
-    } catch (error) {
-      console.error('Fehler beim Prüfen des Mission-Progress:', error);
-    }
-  };
-
-  // Mission-Progress nach dem Schließen des Mission-UI prüfen
-  const handleMissionModalClose = async () => {
-    setIsMissionModalOpen(false);
-    // Kurze Verzögerung, dann Mission-Progress prüfen
-    setTimeout(() => {
-      checkMissionProgress();
-    }, 500);
   };
 
   return (
@@ -1026,8 +1041,11 @@ export default function RoomView({
       <GuidedMissionModal
         missionId="mission1_crypto_bank"
         isOpen={isMissionModalOpen}
-        onClose={handleMissionModalClose}
-        onMissionComplete={checkMissionProgress}
+        onClose={() => setIsMissionModalOpen(false)}
+        onMissionComplete={() => {
+          setMissionCompleted(true);
+          setIsMissionModalOpen(false);
+        }}
       />
     </div>
   );

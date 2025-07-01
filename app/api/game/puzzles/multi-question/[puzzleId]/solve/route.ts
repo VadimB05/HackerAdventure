@@ -75,12 +75,7 @@ export async function POST(
 
       // Prüfen ob maximale Versuche erreicht
       const currentAttempts = progress?.attempts || 0;
-      if (currentAttempts >= puzzle.max_attempts) {
-        return NextResponse.json({
-          success: false,
-          error: 'Maximale Anzahl Versuche erreicht'
-        }, { status: 400 });
-      }
+      const maxAttemptsReached = currentAttempts >= puzzle.max_attempts;
 
       // Frage-Daten strukturieren
       const question: any = {
@@ -134,7 +129,7 @@ export async function POST(
       const validationMessage = isCorrect ? 'Richtige Antwort!' : 'Falsche Antwort';
 
       // Transaktion starten
-      await executeQuery('START TRANSACTION');
+      const transactionQueries = [];
 
       try {
         // Versuch registrieren
@@ -156,39 +151,49 @@ export async function POST(
 
         if (progress) {
           // Bestehenden Fortschritt aktualisieren
-          await executeQuery(
-            'UPDATE puzzle_progress SET attempts = ?, best_time_seconds = CASE WHEN ? < best_time_seconds OR best_time_seconds IS NULL THEN ? ELSE best_time_seconds END, is_completed = ?, completed_at = CASE WHEN ? THEN NOW() ELSE completed_at END WHERE user_id = ? AND puzzle_id = ?',
-            [newAttempts, timeSpent || 0, timeSpent || 0, allCompleted, allCompleted, userId, puzzleId]
-          );
+          transactionQueries.push({
+            query: 'UPDATE puzzle_progress SET attempts = ?, best_time_seconds = CASE WHEN ? < best_time_seconds OR best_time_seconds IS NULL THEN ? ELSE best_time_seconds END, is_completed = ?, completed_at = CASE WHEN ? THEN NOW() ELSE completed_at END WHERE user_id = ? AND puzzle_id = ?',
+            params: [newAttempts, timeSpent || 0, timeSpent || 0, allCompleted, allCompleted, userId, puzzleId]
+          });
         } else {
           // Neuen Fortschritt erstellen
-          await executeQuery(
-            'INSERT INTO puzzle_progress (user_id, puzzle_id, attempts, best_time_seconds, is_completed, completed_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, puzzleId, newAttempts, timeSpent || 0, allCompleted, allCompleted ? new Date() : null]
-          );
+          transactionQueries.push({
+            query: 'INSERT INTO puzzle_progress (user_id, puzzle_id, attempts, best_time_seconds, is_completed, completed_at) VALUES (?, ?, ?, ?, ?, ?)',
+            params: [userId, puzzleId, newAttempts, timeSpent || 0, allCompleted, allCompleted ? new Date() : null]
+          });
         }
 
-        // Belohnungen nur bei vollständiger Lösung
-        let rewards = null;
-        if (allCompleted) {
-          rewards = {
-            exp: puzzle.reward_exp,
-            items: JSON.parse(puzzle.reward_items || '[]')
-          };
+        if (isCorrect && !maxAttemptsReached) {
+          // Rätsel als gelöst markieren (nur wenn nicht bei Maximum)
+          transactionQueries.push({
+            query: 'UPDATE puzzle_progress SET is_completed = true, completed_at = NOW() WHERE user_id = ? AND puzzle_id = ?',
+            params: [userId, puzzleId]
+          });
+
+          // Statistik aktualisieren (nur Rätsel-Zähler, keine Belohnungen)
+          transactionQueries.push({
+            query: 'UPDATE player_stats SET puzzles_solved = puzzles_solved + 1 WHERE user_id = ?',
+            params: [userId]
+          });
+        }
+
+        await executeQuery('START TRANSACTION');
+
+        for (const query of transactionQueries) {
+          await executeQuery(query.query, query.params);
         }
 
         await executeQuery('COMMIT');
 
         return NextResponse.json({
           success: true,
-          isCorrect,
-          message: validationMessage,
+          isCorrect: isCorrect,
+          message: isCorrect ? 'Rätsel erfolgreich gelöst!' : 'Falsche Antwort. Versuche es erneut.',
           attempts: newAttempts,
           maxAttempts: puzzle.max_attempts,
           completedQuestions: isCorrect ? [questionId.toString()] : [],
           totalQuestions,
           allCompleted,
-          rewards,
           explanation: isCorrect ? question.explanation : null
         });
 

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
-  try {
-    // TODO: Echte Authentifizierung implementieren
-    const userId = 1; // Später aus Session extrahieren
-
-    const { searchParams } = new URL(request.url);
-    const requestedUserId = searchParams.get('userId');
+  return requireAuth(async (req) => {
+    try {
+      const userId = req.user!.id;
 
     console.log(`Progress-API aufgerufen für User: ${userId}`);
 
@@ -149,11 +147,12 @@ export async function GET(request: NextRequest) {
       }
     });
 
-  } catch (error) {
-    console.error('Fehler beim Abrufen des Spieler-Fortschritts:', error);
-    return NextResponse.json(
-      { success: false, error: `Interner Server-Fehler: ${error}` },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('Fehler beim Abrufen des Spieler-Fortschritts:', error);
+      return NextResponse.json(
+        { success: false, error: `Interner Server-Fehler: ${error}` },
+        { status: 500 }
+      );
+    }
+  })(request);
 } 

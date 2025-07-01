@@ -35,7 +35,7 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
   const [isLoading, setIsLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [showPuzzle, setShowPuzzle] = useState(false);
-  const { setCurrentMission, alarmLevel } = useGameState();
+  const { setCurrentMission, alarmLevel, updateBitcoinBalance, setBitcoinBalance } = useGameState();
   const [error, setError] = useState<string | null>(null);
   const [puzzleProgress, setPuzzleProgress] = useState<{[key: string]: boolean}>({});
   const [lastAlarmLevel, setLastAlarmLevel] = useState(0);
@@ -75,7 +75,7 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
       }
 
       // Puzzle-Fortschritt laden
-      const progressRes = await fetch('/api/game/progress?userId=1');
+      const progressRes = await fetch('/api/game/progress');
       const progressData = await progressRes.json();
       
       if (progressData.success) {
@@ -90,6 +90,7 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
         
         setPuzzleProgress(puzzleProgressMap);
         console.log('Gelöste Rätsel:', completedPuzzles);
+        console.log('Puzzle Progress Map:', puzzleProgressMap);
         
         // Zum nächsten ungelösten Rätsel springen
         const mission = missionData.mission;
@@ -102,6 +103,7 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
           // Suche nach dem nächsten ungelösten Rätsel
           for (let i = 0; i < mission.steps.length; i++) {
             const step = mission.steps[i];
+            console.log(`Prüfe Schritt ${i}: ${step.title}, puzzleId: ${step.puzzleId}, gelöst: ${puzzleProgressMap[step.puzzleId]}`);
             if (step.puzzleId && !puzzleProgressMap[step.puzzleId]) {
               nextStep = i;
               break;
@@ -164,8 +166,48 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
       setIsCompleted(true);
       await saveMissionProgress(mission.missionId, 'completed');
       console.log('Mission abgeschlossen!');
-      if (onMissionComplete) {
-        onMissionComplete();
+      
+      // SOFORT Belohnungen vergeben - nicht erst beim Schließen!
+      try {
+        const response = await fetch(`/api/game/missions/${mission.missionId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Mission-Belohnungen sofort vergeben:', result);
+          
+          // Bitcoin-Balance im Frontend sofort aktualisieren
+          if (mission.rewardBitcoins && Number(mission.rewardBitcoins) > 0) {
+            updateBitcoinBalance(mission.rewardBitcoins, `Mission abgeschlossen: ${mission.name}`, true);
+          }
+          
+          // Aktuelle Balance aus dem Backend holen und setzen
+          try {
+            const stateRes = await fetch('/api/game/state', { credentials: 'include' });
+            if (stateRes.ok) {
+              const stateData = await stateRes.json();
+              if (stateData.success && stateData.gameState) {
+                if (typeof setBitcoinBalance === 'function') {
+                  setBitcoinBalance(Number(stateData.gameState.bitcoins) || 0);
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Fehler beim Synchronisieren der Bitcoin-Balance:', e);
+          }
+          
+          // Callback sofort aufrufen
+          if (onMissionComplete) {
+            onMissionComplete();
+          }
+        } else {
+          console.error('Fehler beim Vergeben der Belohnungen');
+        }
+      } catch (error) {
+        console.error('Fehler beim Vergeben der Belohnungen:', error);
       }
     }
   };
@@ -247,12 +289,7 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
             <div className="text-center p-8">
               <h2 className="text-xl font-bold mb-4">Mission abgeschlossen!</h2>
               <p className="mb-2">Belohnung: <b>{mission?.rewardBitcoins} BTC</b> & <b>{mission?.rewardExp} XP</b></p>
-              <Button onClick={() => {
-                if (onMissionComplete) {
-                  onMissionComplete();
-                }
-                onClose();
-              }}>Schließen</Button>
+              <Button onClick={onClose}>Schließen</Button>
             </div>
           </>
         ) : showPuzzle && mission?.steps[currentStep].puzzleId ? (

@@ -278,30 +278,6 @@ export default function PuzzleCodeInput({
           setIsCorrect(true);
           setShowResult(true);
           
-          // Mission-Progress prüfen nach erfolgreichem Lösen
-          try {
-            const missionResponse = await fetch('/api/game/progress/mission', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                roomId: puzzleData?.roomId || 'basement'
-              }),
-            });
-
-            const missionData = await missionResponse.json();
-            console.log(`[DEBUG] Mission Progress Response:`, missionData);
-
-            if (missionData.success && missionData.isCompleted) {
-              console.log(`[DEBUG] Mission abgeschlossen! Belohnungen:`, missionData.rewards);
-              // Hier könntest du eine Benachrichtigung anzeigen
-            }
-          } catch (missionError) {
-            console.error('Fehler beim Prüfen des Mission-Progress:', missionError);
-          }
-
           setTimeout(() => {
             onSolve(puzzleId, true);
           }, 2000);
@@ -532,12 +508,6 @@ export default function PuzzleCodeInput({
                 <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-green-400 mb-2">Rätsel gelöst!</h3>
                 <p className="text-gray-300 mb-4">Glückwunsch! Du hast das Rätsel erfolgreich abgeschlossen.</p>
-                <div className="flex justify-center mb-4">
-                  <div className="flex items-center gap-2 text-blue-400">
-                    <Trophy className="h-5 w-5" />
-                    <span>+{puzzleData.rewardExp} XP</span>
-                  </div>
-                </div>
                 <Button
                   onClick={() => onSolve(puzzleId, true)}
                   className="bg-green-600 hover:bg-green-700 text-white"

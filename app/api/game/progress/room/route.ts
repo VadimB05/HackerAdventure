@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
-  try {
-    // TODO: Echte Authentifizierung implementieren
-    const userId = 1; // Später aus Session extrahieren
+  return requireAuth(async (req) => {
+    try {
+      const userId = req.user!.id;
 
     const body = await request.json();
     const { roomId, missionId } = body;
@@ -115,11 +116,12 @@ export async function POST(request: NextRequest) {
       message: `Willkommen im ${room.name}!`
     });
 
-  } catch (error) {
-    console.error('Fehler beim Raumwechsel:', error);
-    return NextResponse.json(
-      { success: false, error: 'Interner Server-Fehler' },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('Fehler beim Raumwechsel:', error);
+      return NextResponse.json(
+        { success: false, error: 'Interner Server-Fehler' },
+        { status: 500 }
+      );
+    }
+  })(request);
 } 

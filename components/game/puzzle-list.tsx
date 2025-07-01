@@ -22,8 +22,6 @@ interface Puzzle {
   difficulty: number;
   timeLimitSeconds?: number;
   maxAttempts: number;
-  rewardExp: number;
-  rewardBitcoins?: number;
   hints?: string[];
   isCompleted?: boolean;
 }

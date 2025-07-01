@@ -43,6 +43,9 @@ interface MoneyNotificationProps {
 function MoneyNotification({ amount, message, onRemove }: MoneyNotificationProps) {
   const [isVisible, setIsVisible] = useState(true)
   const [isLeaving, setIsLeaving] = useState(false)
+  
+  // Sichere Konvertierung zu Number
+  const safeAmount = Number(amount) || 0
 
   useEffect(() => {
     // Start exit animation after 4 seconds
@@ -75,7 +78,7 @@ function MoneyNotification({ amount, message, onRemove }: MoneyNotificationProps
     >
       <Bitcoin className="h-6 w-6 mr-2 text-green-500" />
       <div>
-        <div className="font-bold text-lg">+{amount.toFixed(4)} BTC</div>
+        <div className="font-bold text-lg">+{safeAmount.toFixed(4)} BTC</div>
         <div className="text-sm text-green-300">{message}</div>
       </div>
     </div>

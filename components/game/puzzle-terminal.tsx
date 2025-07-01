@@ -141,17 +141,6 @@ export default function PuzzleTerminal({
           reason: 'Alarm-Level erhöht - Versuche zurückgesetzt'
         }),
       });
-
-      if (response.ok) {
-        console.log('Versuche erfolgreich zurückgesetzt');
-        // Versuche sofort auf 0 setzen
-        setAttempts(0);
-        
-        // Kurze Nachricht anzeigen
-        addCommandToHistory('system', 'Versuche wurden zurückgesetzt. Du kannst es erneut versuchen!');
-      } else {
-        console.log('Fehler beim Zurücksetzen der Versuche');
-      }
     } catch (error) {
       console.error('Fehler beim Zurücksetzen der Versuche:', error);
     }
@@ -333,30 +322,6 @@ export default function PuzzleTerminal({
 
         if (data.isCorrect) {
           addCommandToHistory('system', `${data.message}\nRätsel gelöst!`);
-          
-          // Mission-Progress prüfen nach erfolgreichem Lösen
-          try {
-            const missionResponse = await fetch('/api/game/progress/mission', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                roomId: puzzleData?.roomId || 'basement'
-              }),
-            });
-
-            const missionData = await missionResponse.json();
-            console.log(`[DEBUG] Mission Progress Response:`, missionData);
-
-            if (missionData.success && missionData.isCompleted) {
-              console.log(`[DEBUG] Mission abgeschlossen! Belohnungen:`, missionData.rewards);
-              addCommandToHistory('system', `Mission abgeschlossen! Belohnung: ${missionData.rewards.bitcoins} BTC, ${missionData.rewards.exp} XP`);
-            }
-          } catch (missionError) {
-            console.error('Fehler beim Prüfen des Mission-Progress:', missionError);
-          }
           
           onSolve(puzzleId, true);
         } else {
@@ -622,12 +587,6 @@ export default function PuzzleTerminal({
                 <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-green-400 mb-2">Terminal-Rätsel gelöst!</h3>
                 <p className="text-gray-300 mb-4">Glückwunsch! Du hast das Terminal-Rätsel erfolgreich abgeschlossen.</p>
-                <div className="flex justify-center mb-4">
-                  <div className="flex items-center gap-2 text-blue-400">
-                    <Trophy className="h-5 w-5" />
-                    <span>+{puzzleData.rewardExp} XP</span>
-                  </div>
-                </div>
                 <Button
                   onClick={() => onSolve(puzzleId, true)}
                   className="bg-green-600 hover:bg-green-700 text-white"

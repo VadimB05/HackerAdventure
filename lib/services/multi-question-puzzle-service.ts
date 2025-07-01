@@ -48,10 +48,6 @@ export interface SolveMultiQuestionResponse {
   completedQuestions: string[];
   totalQuestions: number;
   allCompleted: boolean;
-  rewards?: {
-    exp: number;
-    items: string[];
-  };
   explanation?: string;
   error?: string;
 }
@@ -133,7 +129,6 @@ export async function solveMultiQuestionPuzzleDebug(puzzleId: string, request: S
       completedQuestions: data.completedQuestions,
       totalQuestions: data.totalQuestions,
       allCompleted: data.allCompleted,
-      rewards: data.rewards,
       explanation: data.explanation
     };
   } catch (error) {
@@ -191,7 +186,6 @@ export async function solveMultiQuestionPuzzle(puzzleId: string, request: SolveM
       completedQuestions: data.completedQuestions,
       totalQuestions: data.totalQuestions,
       allCompleted: data.allCompleted,
-      rewards: data.rewards,
       explanation: data.explanation
     };
   } catch (error) {

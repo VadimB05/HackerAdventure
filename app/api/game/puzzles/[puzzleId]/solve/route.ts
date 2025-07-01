@@ -245,25 +245,25 @@ export async function POST(
           params: [userId, puzzleId]
         });
 
-        // Belohnungen vergeben
-        if (puzzle.reward_bitcoins > 0) {
-          transactionQueries.push({
-            query: 'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
-            params: [puzzle.reward_bitcoins, userId]
-          });
-        }
+        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+        // if (puzzle.reward_bitcoins > 0) {
+        //   transactionQueries.push({
+        //     query: 'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
+        //     params: [puzzle.reward_bitcoins, userId]
+        //   });
+        // }
 
-        if (puzzle.reward_exp > 0) {
-          transactionQueries.push({
-            query: 'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
-            params: [puzzle.reward_exp, userId]
-          });
-        }
+        // if (puzzle.reward_exp > 0) {
+        //   transactionQueries.push({
+        //     query: 'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
+        //     params: [puzzle.reward_exp, userId]
+        //   });
+        // }
 
-        // Statistik aktualisieren
+        // Statistik aktualisieren (nur Rätsel-Zähler, keine Belohnungen)
         transactionQueries.push({
-          query: 'UPDATE player_stats SET puzzles_solved = puzzles_solved + 1, total_bitcoins_earned = total_bitcoins_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
-          params: [puzzle.reward_bitcoins, puzzle.reward_exp, userId]
+          query: 'UPDATE player_stats SET puzzles_solved = puzzles_solved + 1 WHERE user_id = ?',
+          params: [userId]
         });
 
         // Prüfen ob alle Rätsel der Mission gelöst wurden
@@ -292,43 +292,53 @@ export async function POST(
             );
 
             if (missionId) {
-              // Mission-Progress erstellen oder aktualisieren
-              transactionQueries.push({
-                query: `INSERT INTO mission_progress (user_id, mission_id, is_completed, completed_at, puzzles_completed) 
-                        VALUES (?, ?, true, NOW(), ?) 
-                        ON DUPLICATE KEY UPDATE 
-                        is_completed = true, 
-                        completed_at = NOW(), 
-                        puzzles_completed = ?`,
-                params: [userId, missionId.mission_id, solvedRequiredPuzzles.length, solvedRequiredPuzzles.length]
-              });
-
-              // Mission-Belohnungen vergeben
-              const mission = await executeQuerySingle<{reward_bitcoins: number, reward_exp: number}>(
-                'SELECT reward_bitcoins, reward_exp FROM missions WHERE mission_id = ?',
-                [missionId.mission_id]
+              // Prüfen, ob die Mission bereits abgeschlossen wurde
+              const existingMissionProgress = await executeQuerySingle<{is_completed: boolean}>(
+                'SELECT is_completed FROM mission_progress WHERE user_id = ? AND mission_id = ?',
+                [userId, missionId.mission_id]
               );
 
-              if (mission && (mission.reward_bitcoins > 0 || mission.reward_exp > 0)) {
-                if (mission.reward_bitcoins > 0) {
-                  transactionQueries.push({
-                    query: 'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
-                    params: [mission.reward_bitcoins, userId]
-                  });
-                }
+              const isMissionAlreadyCompleted = existingMissionProgress?.is_completed === true;
 
-                if (mission.reward_exp > 0) {
-                  transactionQueries.push({
-                    query: 'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
-                    params: [mission.reward_exp, userId]
-                  });
-                }
-
-                // Mission-Statistik aktualisieren
+              if (!isMissionAlreadyCompleted) {
+                console.log(`[DEBUG] Mission erstmals abgeschlossen - vergebe Belohnungen`);
+                
+                // Mission-Progress erstellen
                 transactionQueries.push({
-                  query: 'UPDATE player_stats SET missions_completed = missions_completed + 1, total_bitcoins_earned = total_bitcoins_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
-                  params: [mission.reward_bitcoins, mission.reward_exp, userId]
+                  query: `INSERT IGNORE INTO mission_progress (user_id, mission_id, is_completed, completed_at, puzzles_completed) 
+                          VALUES (?, ?, true, NOW(), ?)`,
+                  params: [userId, missionId.mission_id, solvedRequiredPuzzles.length]
                 });
+
+                // Mission-Belohnungen vergeben (nur beim ersten Mal)
+                const mission = await executeQuerySingle<{reward_bitcoins: number, reward_exp: number}>(
+                  'SELECT reward_bitcoins, reward_exp FROM missions WHERE mission_id = ?',
+                  [missionId.mission_id]
+                );
+
+                if (mission && (mission.reward_bitcoins > 0 || mission.reward_exp > 0)) {
+                  if (mission.reward_bitcoins > 0) {
+                    transactionQueries.push({
+                      query: 'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
+                      params: [mission.reward_bitcoins, userId]
+                    });
+                  }
+
+                  if (mission.reward_exp > 0) {
+                    transactionQueries.push({
+                      query: 'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
+                      params: [mission.reward_exp, userId]
+                    });
+                  }
+
+                  // Mission-Statistik aktualisieren
+                  transactionQueries.push({
+                    query: 'UPDATE player_stats SET missions_completed = missions_completed + 1, total_bitcoins_earned = total_bitcoins_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
+                    params: [mission.reward_bitcoins, mission.reward_exp, userId]
+                  });
+                }
+              } else {
+                console.log(`[DEBUG] Mission bereits abgeschlossen - keine Belohnungen`);
               }
             }
           }
@@ -349,11 +359,12 @@ export async function POST(
         attempts: newAttempts,
         maxAttempts: puzzle.max_attempts,
         maxAttemptsReached: maxAttemptsReached,
-        rewards: finalIsCorrect ? {
-          bitcoins: puzzle.reward_bitcoins,
-          exp: puzzle.reward_exp,
-          items: JSON.parse(puzzle.reward_items || '[]')
-        } : null
+        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+        // rewards: finalIsCorrect ? {
+        //   bitcoins: puzzle.reward_bitcoins,
+        //   exp: puzzle.reward_exp,
+        //   items: JSON.parse(puzzle.reward_items || '[]')
+        // } : null
       });
 
     } catch (error) {

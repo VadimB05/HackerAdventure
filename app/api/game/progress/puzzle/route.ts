@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
-  try {
-    // TODO: Echte Authentifizierung implementieren
-    // Für jetzt: Mock-User-ID verwenden
-    const userId = 1; // Später aus Session extrahieren
+  return requireAuth(async (req) => {
+    try {
+      const userId = req.user!.id;
 
     const body = await request.json();
     const { puzzleId, isCompleted, attempts, timeSpent, hintsUsed } = body;
@@ -21,11 +21,12 @@ export async function POST(request: NextRequest) {
     const puzzle = await executeQuerySingle<{
       id: number;
       puzzle_id: string;
-      reward_exp: number;
-      reward_bitcoins: number;
+      // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+      // reward_exp: number;
+      // reward_bitcoins: number;
       max_attempts: number;
     }>(
-      'SELECT id, puzzle_id, reward_exp, reward_bitcoins, max_attempts FROM puzzles WHERE puzzle_id = ?',
+      'SELECT id, puzzle_id, max_attempts FROM puzzles WHERE puzzle_id = ?',
       [puzzleId]
     );
 
@@ -83,39 +84,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
     // Belohnungen vergeben, wenn Rätsel zum ersten Mal gelöst wurde
-    let rewards = null;
-    if (isCompleted && (!progress || !progress.is_completed)) {
-      // Spieler-Statistiken aktualisieren
-      await executeQuery(
-        'UPDATE game_states SET experience_points = experience_points + ?, bitcoins = bitcoins + ? WHERE user_id = ?',
-        [puzzle.reward_exp, puzzle.reward_bitcoins, userId]
-      );
+    // let rewards = null;
+    // if (isCompleted && (!progress || !progress.is_completed)) {
+    //   // Spieler-Statistiken aktualisieren
+    //   await executeQuery(
+    //     'UPDATE game_states SET experience_points = experience_points + ?, bitcoins = bitcoins + ? WHERE user_id = ?',
+    //     [puzzle.reward_exp, puzzle.reward_bitcoins, userId]
+    //   );
 
-      // Level berechnen und aktualisieren
-      const gameState = await executeQuerySingle<{
-        experience_points: number;
-        level: number;
-      }>(
-        'SELECT experience_points, level FROM game_states WHERE user_id = ?',
-        [userId]
-      );
+    //   // Level berechnen und aktualisieren
+    //   const gameState = await executeQuerySingle<{
+    //     experience_points: number;
+    //     level: number;
+    //   }>(
+    //     'SELECT experience_points, level FROM game_states WHERE user_id = ?',
+    //     [userId]
+    //   );
 
-      if (gameState) {
-        const newLevel = Math.floor(gameState.experience_points / 100) + 1;
-        if (newLevel > gameState.level) {
-          await executeQuery(
-            'UPDATE game_states SET level = ? WHERE user_id = ?',
-            [newLevel, userId]
-          );
-        }
-      }
+    //   if (gameState) {
+    //     const newLevel = Math.floor(gameState.experience_points / 100) + 1;
+    //     if (newLevel > gameState.level) {
+    //       await executeQuery(
+    //         'UPDATE game_states SET level = ? WHERE user_id = ?',
+    //         [newLevel, userId]
+    //       );
+    //     }
+    //   }
 
-      rewards = {
-        exp: puzzle.reward_exp,
-        bitcoins: puzzle.reward_bitcoins
-      };
-    }
+    //   rewards = {
+    //     exp: puzzle.reward_exp,
+    //     bitcoins: puzzle.reward_bitcoins
+    //   };
+    // }
 
     // Aktualisierten Fortschritt zurückgeben
     const updatedProgress = await executeQuerySingle<{
@@ -138,15 +140,17 @@ export async function POST(request: NextRequest) {
         bestTimeSeconds: updatedProgress?.best_time_seconds || null,
         completedAt: updatedProgress?.completed_at || null,
         hintsUsed: updatedProgress?.hints_used || 0
-      },
-      rewards
+      }
+      // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
+      // rewards
     });
 
-  } catch (error) {
-    console.error('Fehler beim Speichern des Rätsel-Fortschritts:', error);
-    return NextResponse.json(
-      { success: false, error: 'Interner Server-Fehler' },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('Fehler beim Speichern des Rätsel-Fortschritts:', error);
+      return NextResponse.json(
+        { success: false, error: 'Interner Server-Fehler' },
+        { status: 500 }
+      );
+    }
+  })(request);
 } 

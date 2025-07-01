@@ -111,40 +111,33 @@ export async function POST(request: NextRequest) {
       console.log(`[DEBUG] Mission-Belohnungen:`, mission);
 
       if (isMissionCompleted) {
-        console.log(`[DEBUG] Markiere Mission als abgeschlossen und vergebe Belohnungen`);
+        console.log(`[DEBUG] Mission ist abgeschlossen - prüfe Status`);
         
-        // Mission als abgeschlossen markieren
-        transactionQueries.push({
-          query: `INSERT INTO mission_progress (user_id, mission_id, is_completed, completed_at) 
-                  VALUES (?, ?, true, NOW()) 
-                  ON DUPLICATE KEY UPDATE 
-                  is_completed = true, 
-                  completed_at = NOW()`,
-          params: [userId, missionId]
-        });
+        // Prüfen, ob die Mission bereits abgeschlossen wurde
+        const existingProgress = await executeQuerySingle<{is_completed: boolean}>(
+          'SELECT is_completed FROM mission_progress WHERE user_id = ? AND mission_id = ?',
+          [userId, missionId]
+        );
 
-        if (mission) {
-          // Bitcoin-Belohnung vergeben
-          if (mission.reward_bitcoins > 0) {
-            transactionQueries.push({
-              query: 'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
-              params: [mission.reward_bitcoins, userId]
-            });
-          }
+        console.log(`[DEBUG] Existing progress query result:`, existingProgress);
+        console.log(`[DEBUG] Existing progress type:`, typeof existingProgress?.is_completed);
+        console.log(`[DEBUG] Existing progress value:`, existingProgress?.is_completed);
 
-          // XP-Belohnung vergeben
-          if (mission.reward_exp > 0) {
-            transactionQueries.push({
-              query: 'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
-              params: [mission.reward_exp, userId]
-            });
-          }
+        const isAlreadyCompleted = existingProgress?.is_completed === true;
+        console.log(`[DEBUG] Mission bereits abgeschlossen: ${isAlreadyCompleted}`);
 
-          // Statistik aktualisieren
+        // Nur den Status markieren, keine Belohnungen vergeben
+        if (!isAlreadyCompleted) {
+          console.log(`[DEBUG] Markiere Mission als abgeschlossen (ohne Belohnungen)`);
+          
+          // Nur Mission als abgeschlossen markieren
           transactionQueries.push({
-            query: 'UPDATE player_stats SET missions_completed = missions_completed + 1, total_bitcoins_earned = total_bitcoins_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
-            params: [mission.reward_bitcoins, mission.reward_exp, userId]
+            query: `INSERT IGNORE INTO mission_progress (user_id, mission_id, is_completed, completed_at) 
+                    VALUES (?, ?, true, NOW())`,
+            params: [userId, missionId]
           });
+        } else {
+          console.log(`[DEBUG] Mission bereits abgeschlossen - nichts zu tun`);
         }
       }
 

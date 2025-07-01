@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
-  try {
-    // TODO: Echte Authentifizierung implementieren
-    const userId = 1; // Später aus Session extrahieren
+  return requireAuth(async (req) => {
+    try {
+      const userId = req.user!.id;
 
     const { searchParams } = new URL(request.url);
     const roomId = searchParams.get('roomId');
@@ -104,11 +105,12 @@ export async function GET(request: NextRequest) {
       currentRoom: gameState.current_room
     });
 
-  } catch (error) {
-    console.error('Fehler beim Abrufen der Exits:', error);
-    return NextResponse.json(
-      { success: false, error: 'Interner Server-Fehler' },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('Fehler beim Abrufen der Exits:', error);
+      return NextResponse.json(
+        { success: false, error: 'Interner Server-Fehler' },
+        { status: 500 }
+      );
+    }
+  })(request);
 } 
