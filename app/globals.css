@@ -75,6 +75,15 @@
   }
 }
 
+/* Admin Panel specific styles */
+.admin-panel {
+  background-color: rgb(17 24 39) !important; /* bg-gray-900 */
+}
+
+.admin-panel * {
+  border-color: rgb(55 65 81) !important; /* border-gray-700 */
+}
+
 /* Custom animations for the game */
 @keyframes slideIn {
   from {
