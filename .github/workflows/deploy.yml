@@ -47,7 +47,7 @@ jobs:
         NODE_ENV: production
         # Hier können weitere Umgebungsvariablen hinzugefügt werden
         # DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_SECRET: ${{ secrets.JWT_TOKEN }}
         # CUSTOM_KEY: ${{ secrets.CUSTOM_KEY }}
         
     - name: Upload build artifacts
