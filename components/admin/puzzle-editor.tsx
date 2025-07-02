@@ -33,9 +33,10 @@ interface PuzzleEditorProps {
   onSave?: (puzzle: PuzzleData) => void;
   onCancel?: () => void;
   initialPuzzle?: PuzzleData;
+  rooms?: { room_id: string; name: string }[];
 }
 
-export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle }: PuzzleEditorProps) {
+export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle, rooms = [] }: PuzzleEditorProps) {
   const [puzzle, setPuzzle] = useState<PuzzleData>({
     puzzleId: '',
     roomId: roomId,
@@ -110,27 +111,34 @@ export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle }
             
             <div>
               <Label>Antwortoptionen</Label>
-              {['a', 'b', 'c', 'd'].map((option) => (
-                <div key={option} className="flex gap-2 mt-2">
-                  <Input
-                    value={puzzle.data.multiple_choice?.options?.[option.charCodeAt(0) - 97] || ''}
-                    onChange={(e) => {
-                      const options = [...(puzzle.data.multiple_choice?.options || ['', '', '', ''])];
-                      options[option.charCodeAt(0) - 97] = e.target.value;
-                      handleDataChange('options', options);
-                    }}
-                    placeholder={`Option ${option.toUpperCase()}`}
-                  />
-                  <Button
-                    type="button"
-                    variant={puzzle.data.multiple_choice?.correct_answer === option ? 'default' : 'outline'}
-                    onClick={() => handleDataChange('correct_answer', option)}
-                    className="w-20"
-                  >
-                    {option.toUpperCase()}
-                  </Button>
-                </div>
-              ))}
+              {['a', 'b', 'c', 'd'].map((option) => {
+                const optionIndex = option.charCodeAt(0) - 97;
+                const answerText = puzzle.data.multiple_choice?.options?.[optionIndex] || '';
+                return (
+                  <div key={option} className="flex gap-2 mt-2">
+                    <Input
+                      value={puzzle.data.multiple_choice?.options?.[optionIndex] || ''}
+                      onChange={(e) => {
+                        const options = [...(puzzle.data.multiple_choice?.options || ['', '', '', ''])];
+                        options[optionIndex] = e.target.value;
+                        handleDataChange('options', options);
+                      }}
+                      placeholder={`Option ${option.toUpperCase()}`}
+                    />
+                    <Button
+                      type="button"
+                      variant={puzzle.data.multiple_choice?.correct_answer === answerText ? 'default' : 'outline'}
+                      onClick={() => {
+                        handleDataChange('correct_answer', answerText);
+                        console.log('Setze correct_answer:', answerText);
+                      }}
+                      className="w-20"
+                    >
+                      {option.toUpperCase()}
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
 
             <div>
@@ -477,6 +485,31 @@ export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle }
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="roomId">Raum *</Label>
+              {rooms.length > 0 ? (
+                <Select value={puzzle.roomId} onValueChange={(value) => handleInputChange('roomId', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Raum auswählen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rooms.map(room => (
+                      <SelectItem key={room.room_id} value={room.room_id}>
+                        {room.name} ({room.room_id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="roomId"
+                  value={puzzle.roomId}
+                  onChange={(e) => handleInputChange('roomId', e.target.value)}
+                  placeholder="intro"
+                />
+              )}
             </div>
 
             <div>
