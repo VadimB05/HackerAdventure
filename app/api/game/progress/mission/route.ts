@@ -158,12 +158,21 @@ export async function POST(request: NextRequest) {
         await executeTransaction(transactionQueries);
       }
 
+      // Aktuellen Mission-Progress-Status abrufen
+      const currentProgress = await executeQuerySingle<{is_completed: boolean, completed_at: string}>(
+        'SELECT is_completed, completed_at FROM mission_progress WHERE user_id = ? AND mission_id = ?',
+        [userId, missionId]
+      );
+
+      console.log(`[DEBUG] Aktueller Mission-Progress:`, currentProgress);
+
       const response = {
         success: true,
         missionId: missionId,
-        isCompleted: isMissionCompleted,
+        isCompleted: isMissionCompleted || Boolean(currentProgress?.is_completed),
         solvedPuzzles: solvedPuzzles.length,
         totalPuzzles: missionPuzzles.length,
+        currentProgress: currentProgress,
         rewards: {
           bitcoins: mission?.reward_bitcoins || 0,
           exp: mission?.reward_exp || 0
