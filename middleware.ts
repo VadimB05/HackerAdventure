@@ -14,8 +14,7 @@ export async function middleware(request: NextRequest) {
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/health',
-    '/api/game/health',
-    '/api/admin/health'
+    '/api/game/health'
   ];
 
   const path = request.nextUrl.pathname;
@@ -56,10 +55,19 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-    // User-Info zum Request hinzufügen
+    // Debug: Token-User loggen
+    console.log('Middleware - Token user:', user);
+
+    // User-Info zum Request hinzufügen (Admin-Status wird in den API-Routen geprüft)
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set('x-user-id', user.userId.toString());
     requestHeaders.set('x-username', user.username);
+
+    // Debug: Headers loggen
+    console.log('Middleware - Setting headers:', {
+      'x-user-id': user.userId.toString(),
+      'x-username': user.username
+    });
 
     // Request mit User-Info weiterleiten
     return NextResponse.next({

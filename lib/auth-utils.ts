@@ -29,7 +29,7 @@ export function getAuthenticatedUser(request: NextRequest) {
   return {
     id: parseInt(userId, 10),
     username,
-    isAdmin: false // TODO: Aus Datenbank laden wenn nötig
+    isAdmin: false // Wird in den API-Routen aus der DB geprüft
   };
 }
 
@@ -111,4 +111,7 @@ export function getUsername(request: NextRequest): string | null {
 export function isAdmin(request: NextRequest): boolean {
   const user = getAuthenticatedUser(request);
   return user?.isAdmin || false;
-} 
+}
+
+// Die requireAdmin Funktion ist bereits vorhanden und funktioniert korrekt
+// Keine zusätzlichen Admin-Funktionen nötig 
