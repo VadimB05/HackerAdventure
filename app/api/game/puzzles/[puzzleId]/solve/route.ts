@@ -70,9 +70,66 @@ export async function POST(
         'SELECT is_completed, attempts, best_time_seconds FROM puzzle_progress WHERE user_id = ? AND puzzle_id = ?',
         [userId, puzzleId]
       );
+      console.log('[DEBUG] puzzle_progress für user', userId, 'und puzzle', puzzleId, ':', progress);
 
       // Prüfen ob bereits gelöst
       if (progress?.is_completed) {
+        // Mission-Completion-Logik auch bei bereits gelöstem Rätsel ausführen!
+        // Prüfen ob alle Rätsel der Mission gelöst wurden
+        const missionPuzzles = await executeQuery<{puzzle_id: string, is_required: boolean}>(
+          `SELECT p.puzzle_id, p.is_required 
+           FROM puzzles p 
+           JOIN rooms r ON p.room_id = r.room_id 
+           WHERE r.mission_id = (SELECT mission_id FROM rooms WHERE room_id = ?)`,
+          [puzzle.room_id]
+        );
+
+        if (missionPuzzles.length > 0) {
+          console.log('[DEBUG] missionPuzzles:', missionPuzzles);
+          const requiredPuzzles = missionPuzzles.filter(p => p.is_required);
+          console.log('[DEBUG] requiredPuzzles:', requiredPuzzles);
+          const solvedRequiredPuzzles = await executeQuery<{puzzle_id: string}>(
+            `SELECT pp.puzzle_id 
+             FROM puzzle_progress pp 
+             WHERE pp.user_id = ? AND pp.is_completed = true AND pp.puzzle_id IN (${requiredPuzzles.map(() => '?').join(',')})`,
+            [userId, ...requiredPuzzles.map(p => p.puzzle_id)]
+          );
+          console.log('[DEBUG] solvedRequiredPuzzles:', solvedRequiredPuzzles);
+
+          // Wenn alle erforderlichen Rätsel gelöst wurden, Mission als abgeschlossen markieren
+          if (solvedRequiredPuzzles.length === requiredPuzzles.length) {
+            const missionId = await executeQuerySingle<{mission_id: string}>(
+              'SELECT mission_id FROM rooms WHERE room_id = ?',
+              [puzzle.room_id]
+            );
+            console.log('[DEBUG] missionId:', missionId);
+
+            if (missionId) {
+              // Prüfen, ob die Mission bereits abgeschlossen wurde
+              const existingMissionProgress = await executeQuerySingle<{is_completed: boolean}>(
+                'SELECT is_completed FROM mission_progress WHERE user_id = ? AND mission_id = ?',
+                [userId, missionId.mission_id]
+              );
+
+              const isMissionAlreadyCompleted = existingMissionProgress?.is_completed === true;
+
+              if (!isMissionAlreadyCompleted) {
+                console.log('[DEBUG] Mission-Completion: Führe Insert in mission_progress aus', {
+                  userId,
+                  missionId: missionId.mission_id,
+                  puzzlesCompleted: solvedRequiredPuzzles.length
+                });
+                const result = await executeQuery(
+                  `INSERT IGNORE INTO mission_progress (user_id, mission_id, is_completed, completed_at, puzzles_completed) 
+                          VALUES (?, ?, true, NOW(), ?)`,
+                  [userId, missionId.mission_id, solvedRequiredPuzzles.length]
+                );
+                console.log('[DEBUG] Mission-Completion: Insert-Result', result);
+              }
+            }
+          }
+        }
+        // Jetzt wie gehabt abbrechen
         return NextResponse.json({
           success: false,
           error: 'Rätsel bereits gelöst'
@@ -275,73 +332,90 @@ export async function POST(
           [puzzle.room_id]
         );
 
+        console.log('[DEBUG] Mission-Completion: Rätsel für Mission gefunden:', missionPuzzles.length);
+
         if (missionPuzzles.length > 0) {
+          console.log('[DEBUG] missionPuzzles:', missionPuzzles);
           const requiredPuzzles = missionPuzzles.filter(p => p.is_required);
-          const solvedRequiredPuzzles = await executeQuery<{puzzle_id: string}>(
-            `SELECT pp.puzzle_id 
-             FROM puzzle_progress pp 
-             WHERE pp.user_id = ? AND pp.is_completed = true AND pp.puzzle_id IN (${requiredPuzzles.map(() => '?').join(',')})`,
-            [userId, ...requiredPuzzles.map(p => p.puzzle_id)]
-          );
-
-          // Wenn alle erforderlichen Rätsel gelöst wurden, Mission als abgeschlossen markieren
-          if (solvedRequiredPuzzles.length === requiredPuzzles.length) {
-            const missionId = await executeQuerySingle<{mission_id: string}>(
-              'SELECT mission_id FROM rooms WHERE room_id = ?',
-              [puzzle.room_id]
+          console.log('[DEBUG] requiredPuzzles:', requiredPuzzles);
+          
+          if (requiredPuzzles.length > 0) {
+            const solvedRequiredPuzzles = await executeQuery<{puzzle_id: string}>(
+              `SELECT pp.puzzle_id 
+               FROM puzzle_progress pp 
+               WHERE pp.user_id = ? AND pp.is_completed = true AND pp.puzzle_id IN (${requiredPuzzles.map(() => '?').join(',')})`,
+              [userId, ...requiredPuzzles.map(p => p.puzzle_id)]
             );
+            console.log('[DEBUG] solvedRequiredPuzzles:', solvedRequiredPuzzles);
 
-            if (missionId) {
-              // Prüfen, ob die Mission bereits abgeschlossen wurde
-              const existingMissionProgress = await executeQuerySingle<{is_completed: boolean}>(
-                'SELECT is_completed FROM mission_progress WHERE user_id = ? AND mission_id = ?',
-                [userId, missionId.mission_id]
+            // Wenn alle erforderlichen Rätsel gelöst wurden, Mission als abgeschlossen markieren
+            if (solvedRequiredPuzzles.length === requiredPuzzles.length) {
+              const missionId = await executeQuerySingle<{mission_id: string}>(
+                'SELECT mission_id FROM rooms WHERE room_id = ?',
+                [puzzle.room_id]
               );
+              console.log('[DEBUG] missionId:', missionId);
 
-              const isMissionAlreadyCompleted = existingMissionProgress?.is_completed === true;
-
-              if (!isMissionAlreadyCompleted) {
-                console.log(`[DEBUG] Mission erstmals abgeschlossen - vergebe Belohnungen`);
-                
-                // Mission-Progress erstellen
-                transactionQueries.push({
-                  query: `INSERT IGNORE INTO mission_progress (user_id, mission_id, is_completed, completed_at, puzzles_completed) 
-                          VALUES (?, ?, true, NOW(), ?)`,
-                  params: [userId, missionId.mission_id, solvedRequiredPuzzles.length]
-                });
-
-                // Mission-Belohnungen vergeben (nur beim ersten Mal)
-                const mission = await executeQuerySingle<{reward_bitcoins: number, reward_exp: number}>(
-                  'SELECT reward_bitcoins, reward_exp FROM missions WHERE mission_id = ?',
-                  [missionId.mission_id]
+              if (missionId) {
+                // Prüfen, ob die Mission bereits abgeschlossen wurde
+                const existingMissionProgress = await executeQuerySingle<{is_completed: boolean}>(
+                  'SELECT is_completed FROM mission_progress WHERE user_id = ? AND mission_id = ?',
+                  [userId, missionId.mission_id]
                 );
 
-                if (mission && (mission.reward_bitcoins > 0 || mission.reward_exp > 0)) {
-                  if (mission.reward_bitcoins > 0) {
-                    transactionQueries.push({
-                      query: 'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
-                      params: [mission.reward_bitcoins, userId]
-                    });
-                  }
+                const isMissionAlreadyCompleted = existingMissionProgress?.is_completed === true;
 
-                  if (mission.reward_exp > 0) {
-                    transactionQueries.push({
-                      query: 'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
-                      params: [mission.reward_exp, userId]
-                    });
-                  }
-
-                  // Mission-Statistik aktualisieren
-                  transactionQueries.push({
-                    query: 'UPDATE player_stats SET missions_completed = missions_completed + 1, total_bitcoins_earned = total_bitcoins_earned + ?, total_exp_earned = total_exp_earned + ? WHERE user_id = ?',
-                    params: [mission.reward_bitcoins, mission.reward_exp, userId]
+                if (!isMissionAlreadyCompleted) {
+                  console.log('[DEBUG] Mission-Completion: Führe Insert in mission_progress aus', {
+                    userId,
+                    missionId: missionId.mission_id,
+                    puzzlesCompleted: solvedRequiredPuzzles.length
                   });
+                  
+                  // Mission-Belohnungen abrufen
+                  const missionRewards = await executeQuerySingle<{reward_bitcoins: number, reward_exp: number}>(
+                    'SELECT reward_bitcoins, reward_exp FROM missions WHERE mission_id = ?',
+                    [missionId.mission_id]
+                  );
+                  
+                  // Mission als abgeschlossen markieren
+                  const result = await executeQuery(
+                    `INSERT IGNORE INTO mission_progress (user_id, mission_id, is_completed, completed_at, puzzles_completed) 
+                            VALUES (?, ?, true, NOW(), ?)`,
+                    [userId, missionId.mission_id, solvedRequiredPuzzles.length]
+                  );
+                  console.log('[DEBUG] Mission-Completion: Insert-Result', result);
+                  
+                  // Mission-Belohnungen vergeben
+                  if (missionRewards) {
+                    if (missionRewards.reward_bitcoins > 0) {
+                      await executeQuery(
+                        'UPDATE game_states SET bitcoins = bitcoins + ? WHERE user_id = ?',
+                        [missionRewards.reward_bitcoins, userId]
+                      );
+                      console.log('[DEBUG] Mission-Completion: Bitcoins vergeben:', missionRewards.reward_bitcoins);
+                    }
+                    
+                    if (missionRewards.reward_exp > 0) {
+                      await executeQuery(
+                        'UPDATE game_states SET experience_points = experience_points + ?, level = FLOOR(1 + SQRT(experience_points / 100)) WHERE user_id = ?',
+                        [missionRewards.reward_exp, userId]
+                      );
+                      console.log('[DEBUG] Mission-Completion: EXP vergeben:', missionRewards.reward_exp);
+                    }
+                  }
+                } else {
+                  console.log('[DEBUG] Mission-Completion: Mission bereits abgeschlossen');
                 }
-              } else {
-                console.log(`[DEBUG] Mission bereits abgeschlossen - keine Belohnungen`);
               }
+            } else {
+              console.log('[DEBUG] Mission-Completion: Nicht alle erforderlichen Rätsel gelöst:', solvedRequiredPuzzles.length, '/', requiredPuzzles.length);
             }
+          } else {
+            console.log('[DEBUG] Mission-Completion: Keine erforderlichen Rätsel gefunden');
           }
+        } else {
+          console.log('[DEBUG] Mission-Completion: Keine Rätsel für Mission gefunden');
         }
       }
 
