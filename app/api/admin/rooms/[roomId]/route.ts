@@ -4,13 +4,17 @@ import { getAuthenticatedUser } from '@/lib/auth-utils';
 import { getUserById } from '@/lib/services/auth-service';
 
 /**
- * Räume-Verwaltung API
- * GET /api/admin/rooms - Alle Räume abrufen
- * POST /api/admin/rooms - Neuen Raum erstellen
+ * Einzelne Raum-Verwaltung API
+ * GET /api/admin/rooms/[roomId] - Raum abrufen
+ * PUT /api/admin/rooms/[roomId] - Raum bearbeiten
+ * DELETE /api/admin/rooms/[roomId] - Raum löschen
  */
 
-// Alle Räume abrufen
-export async function GET(request: NextRequest) {
+// Raum abrufen
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
   try {
     // User-Info aus Headers extrahieren (von Middleware gesetzt)
     const user = getAuthenticatedUser(request);
@@ -24,7 +28,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin-Berechtigung erforderlich' }, { status: 403 });
     }
 
-    const rooms = await executeQuery<{
+    const { roomId } = await params;
+
+    const room = await executeQuerySingle<{
       id: number;
       room_id: string;
       mission_id: string | null;
@@ -47,24 +53,32 @@ export async function GET(request: NextRequest) {
        FROM rooms r
        LEFT JOIN missions m ON r.mission_id = m.mission_id
        LEFT JOIN cities c ON r.city_id = c.city_id
-       ORDER BY r.room_id`
+       WHERE r.room_id = ?`,
+      [roomId]
     );
 
+    if (!room) {
+      return NextResponse.json(
+        { error: 'Raum nicht gefunden' },
+        { status: 404 }
+      );
+    }
+
     // JSON-Strings parsen
-    const formattedRooms = rooms.map(room => ({
+    const formattedRoom = {
       ...room,
       required_items: JSON.parse(room.required_items || '[]'),
       required_puzzles: JSON.parse(room.required_puzzles || '[]'),
       connections: JSON.parse(room.connections || '{}')
-    }));
+    };
 
     return NextResponse.json({
       success: true,
-      rooms: formattedRooms
+      room: formattedRoom
     });
 
   } catch (error) {
-    console.error('Fehler beim Abrufen der Räume:', error);
+    console.error('Fehler beim Abrufen des Raums:', error);
     return NextResponse.json(
       { error: 'Interner Server-Fehler' },
       { status: 500 }
@@ -72,8 +86,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Neuen Raum erstellen
-export async function POST(request: NextRequest) {
+// Raum bearbeiten
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
   try {
     // User-Info aus Headers extrahieren (von Middleware gesetzt)
     const user = getAuthenticatedUser(request);
@@ -87,9 +104,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin-Berechtigung erforderlich' }, { status: 403 });
     }
 
+    const { roomId } = await params;
     const body = await request.json();
     const { 
-      room_id, 
       mission_id, 
       city_id, 
       name, 
@@ -103,24 +120,16 @@ export async function POST(request: NextRequest) {
       ambient_sound 
     } = body;
 
-    // Validierung
-    if (!room_id || !name) {
-      return NextResponse.json(
-        { error: 'room_id und name sind erforderlich' },
-        { status: 400 }
-      );
-    }
-
-    // Prüfen ob room_id bereits existiert
+    // Prüfen ob Raum existiert
     const existingRoom = await executeQuerySingle<{id: number}>(
       'SELECT id FROM rooms WHERE room_id = ?',
-      [room_id]
+      [roomId]
     );
 
-    if (existingRoom) {
+    if (!existingRoom) {
       return NextResponse.json(
-        { error: 'Ein Raum mit dieser room_id existiert bereits' },
-        { status: 409 }
+        { error: 'Raum nicht gefunden' },
+        { status: 404 }
       );
     }
 
@@ -152,15 +161,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Neuen Raum erstellen
-    const result = await executeUpdate(
-      `INSERT INTO rooms (
-        room_id, mission_id, city_id, name, description, background_image, 
-        is_locked, required_level, required_items, required_puzzles, 
-        connections, ambient_sound
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    // Raum aktualisieren
+    await executeUpdate(
+      `UPDATE rooms SET 
+        mission_id = ?, city_id = ?, name = ?, description = ?, 
+        background_image = ?, is_locked = ?, required_level = ?, 
+        required_items = ?, required_puzzles = ?, connections = ?, 
+        ambient_sound = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE room_id = ?`,
       [
-        room_id,
         mission_id || null,
         city_id || null,
         name,
@@ -171,12 +180,13 @@ export async function POST(request: NextRequest) {
         JSON.stringify(required_items || []),
         JSON.stringify(required_puzzles || []),
         JSON.stringify(connections || {}),
-        ambient_sound || null
+        ambient_sound || null,
+        roomId
       ]
     );
 
-    // Erstellten Raum abrufen
-    const newRoom = await executeQuerySingle<{
+    // Aktualisierten Raum abrufen
+    const updatedRoom = await executeQuerySingle<{
       id: number;
       room_id: string;
       mission_id: string | null;
@@ -193,33 +203,105 @@ export async function POST(request: NextRequest) {
       created_at: string;
       updated_at: string;
     }>(
-      'SELECT * FROM rooms WHERE id = ?',
-      [result.insertId]
+      `SELECT r.*, 
+              m.name as mission_name,
+              c.name as city_name
+       FROM rooms r
+       LEFT JOIN missions m ON r.mission_id = m.mission_id
+       LEFT JOIN cities c ON r.city_id = c.city_id
+       WHERE r.room_id = ?`,
+      [roomId]
     );
 
-    if (!newRoom) {
+    if (!updatedRoom) {
       return NextResponse.json(
-        { error: 'Fehler beim Abrufen des erstellten Raums' },
+        { error: 'Fehler beim Abrufen des aktualisierten Raums' },
         { status: 500 }
       );
     }
 
     // JSON-Strings parsen
     const formattedRoom = {
-      ...newRoom,
-      required_items: JSON.parse(newRoom.required_items || '[]'),
-      required_puzzles: JSON.parse(newRoom.required_puzzles || '[]'),
-      connections: JSON.parse(newRoom.connections || '{}')
+      ...updatedRoom,
+      required_items: JSON.parse(updatedRoom.required_items || '[]'),
+      required_puzzles: JSON.parse(updatedRoom.required_puzzles || '[]'),
+      connections: JSON.parse(updatedRoom.connections || '{}')
     };
 
     return NextResponse.json({
       success: true,
       room: formattedRoom,
-      message: 'Raum erfolgreich erstellt'
+      message: 'Raum erfolgreich aktualisiert'
     });
 
   } catch (error) {
-    console.error('Fehler beim Erstellen des Raums:', error);
+    console.error('Fehler beim Aktualisieren des Raums:', error);
+    return NextResponse.json(
+      { error: 'Interner Server-Fehler' },
+      { status: 500 }
+    );
+  }
+}
+
+// Raum löschen
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
+  try {
+    // User-Info aus Headers extrahieren (von Middleware gesetzt)
+    const user = getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Authentifizierung erforderlich' }, { status: 401 });
+    }
+
+    // Admin-Status aus der Datenbank prüfen
+    const dbUser = await getUserById(user.id);
+    if (!dbUser || !dbUser.isAdmin) {
+      return NextResponse.json({ error: 'Admin-Berechtigung erforderlich' }, { status: 403 });
+    }
+
+    const { roomId } = await params;
+
+    // Prüfen ob Raum existiert
+    const existingRoom = await executeQuerySingle<{id: number}>(
+      'SELECT id FROM rooms WHERE room_id = ?',
+      [roomId]
+    );
+
+    if (!existingRoom) {
+      return NextResponse.json(
+        { error: 'Raum nicht gefunden' },
+        { status: 404 }
+      );
+    }
+
+    // Prüfen ob Raum als current_room verwendet wird
+    const roomInUse = await executeQuerySingle<{id: number}>(
+      'SELECT id FROM game_states WHERE current_room = ?',
+      [roomId]
+    );
+
+    if (roomInUse) {
+      return NextResponse.json(
+        { error: 'Raum kann nicht gelöscht werden, da er von Spielern verwendet wird' },
+        { status: 409 }
+      );
+    }
+
+    // Raum löschen (CASCADE löscht automatisch verknüpfte Rätsel und Objekte)
+    await executeUpdate(
+      'DELETE FROM rooms WHERE room_id = ?',
+      [roomId]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'Raum erfolgreich gelöscht'
+    });
+
+  } catch (error) {
+    console.error('Fehler beim Löschen des Raums:', error);
     return NextResponse.json(
       { error: 'Interner Server-Fehler' },
       { status: 500 }
