@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Image, X, CheckCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getUploadUrl } from '@/lib/utils';
 
 interface ImageUploadProps {
   value: string;
@@ -162,7 +163,7 @@ export default function ImageUpload({ value, onChange, placeholder = "Bild ausw√
                 </TooltipTrigger>
                                         <TooltipContent side="right" className="p-0">
                           <img 
-                            src={`/uploads/${image}`} 
+                            src={getUploadUrl(image)} 
                             alt={image}
                             className="w-10 h-10 object-cover rounded border"
                             onError={(e) => {
@@ -192,7 +193,7 @@ export default function ImageUpload({ value, onChange, placeholder = "Bild ausw√
             {value && (
               <div className="relative inline-block">
                 <img 
-                  src={`/uploads/${value}`} 
+                  src={getUploadUrl(value)} 
                   alt="Vorschau" 
                   className="max-h-32 max-w-full rounded-lg border"
                   onError={(e) => {

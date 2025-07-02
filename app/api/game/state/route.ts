@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuerySingle, executeUpdate, executeQuery } from '@/lib/database';
+import { getUploadUrl } from '@/lib/utils';
 
 /**
  * Spielstand abrufen
@@ -112,9 +113,7 @@ export async function GET(request: NextRequest) {
         roomId: currentRoomData.room_id,
         name: currentRoomData.name,
         description: currentRoomData.description,
-        backgroundImage: currentRoomData.background_image 
-          ? `/uploads/${currentRoomData.background_image}`
-          : '/uploads/room-bedroom.png',
+        backgroundImage: getUploadUrl(currentRoomData.background_image),
         ambientSound: currentRoomData.ambient_sound,
         connections: JSON.parse(currentRoomData.connections || '{}'),
         requiredLevel: currentRoomData.required_level,

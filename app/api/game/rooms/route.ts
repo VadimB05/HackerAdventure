@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
+import { getUploadUrl } from '@/lib/utils';
 
 /**
  * Alle verfügbaren Räume abrufen
@@ -51,9 +52,7 @@ export async function GET(request: NextRequest) {
           id: room.room_id,
           name: room.name,
           description: room.description,
-          backgroundImage: room.background_image 
-            ? `/uploads/${room.background_image}`
-            : '/uploads/room-bedroom.png',
+          backgroundImage: getUploadUrl(room.background_image),
           isLocked: !isUnlocked,
           requiredLevel: room.required_level,
           missionId: room.mission_id,

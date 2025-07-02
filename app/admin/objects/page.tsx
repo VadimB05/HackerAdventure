@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { getUploadUrl } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -534,7 +535,7 @@ export default function ObjectsPage() {
                 <div 
                   className="absolute inset-0 bg-gray-100 flex items-center justify-center"
                   style={{
-                    backgroundImage: roomBackground ? `url(/uploads/${roomBackground})` : undefined,
+                    backgroundImage: roomBackground ? `url(${getUploadUrl(roomBackground)})` : undefined,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center'
                   }}
