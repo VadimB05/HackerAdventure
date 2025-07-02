@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle, executeUpdate } from '@/lib/database';
+import { toMySQLTimestamp } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
       // Speicherpunkt-ID generieren
       const saveId = uuidv4();
-      const timestamp = new Date().toISOString();
+      const timestamp = toMySQLTimestamp();
 
       // Speicherpunkt in der Datenbank erstellen
       await executeUpdate(

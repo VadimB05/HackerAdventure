@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
+import { toMySQLTimestamp } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   return requireAuth(async (req) => {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
           newAttempts,
           newHintsUsed,
           bestTime,
-          isCompleted ? new Date().toISOString() : progress.completed_at,
+          isCompleted ? toMySQLTimestamp() : progress.completed_at,
           userId,
           puzzleId
         ]

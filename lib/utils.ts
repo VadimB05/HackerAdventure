@@ -16,3 +16,8 @@ export function formatTimestamp(timestamp: string): string {
     minute: "2-digit",
   })
 }
+
+// Hilfsfunktion für MySQL-kompatible Zeitstempel
+export function toMySQLTimestamp(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
