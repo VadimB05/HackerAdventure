@@ -31,6 +31,12 @@ const navigationItems = [
     description: 'Übersicht über das System' 
   },
   { 
+    name: 'Analytics', 
+    icon: BarChart3, 
+    href: '/admin/analytics', 
+    description: 'Spielmetriken und Statistiken' 
+  },
+  { 
     name: 'Benutzer', 
     icon: Users, 
     href: '/admin/users', 

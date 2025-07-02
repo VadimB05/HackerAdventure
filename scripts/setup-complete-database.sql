@@ -293,7 +293,7 @@ CREATE TABLE IF NOT EXISTS save_points (
     id INT AUTO_INCREMENT PRIMARY KEY,
     save_id VARCHAR(36) UNIQUE NOT NULL, -- UUID für den Speicherpunkt
     user_id INT NOT NULL,
-    event_type ENUM('puzzle_solved', 'mission_completed', 'room_entered', 'item_collected', 'manual_save', 'game_started') NOT NULL,
+    event_type ENUM('puzzle_solved', 'mission_completed', 'room_entered', 'item_collected', 'manual_save', 'game_started', 'intro_modal_completed') NOT NULL,
     event_data JSON DEFAULT '{}', -- Zusätzliche Event-Daten
     game_state_snapshot JSON NOT NULL, -- Vollständiger Spielstand-Snapshot
     is_auto_save BOOLEAN DEFAULT FALSE, -- Unterscheidung zwischen Auto- und Manuellspeicherung
@@ -815,6 +815,106 @@ ON DUPLICATE KEY UPDATE
     hints_used = VALUES(hints_used);
 
 -- ========================================
+-- ANALYTICS TABELLEN ERSTELLEN
+-- ========================================
+
+-- Puzzle-Interaktionen-Log (für detaillierte Analytics)
+CREATE TABLE IF NOT EXISTS puzzle_interaction_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    puzzle_id VARCHAR(100) NOT NULL,
+    action_type ENUM('started', 'attempted', 'failed', 'solved', 'skipped', 'timeout', 'hint_used', 'abandoned') NOT NULL,
+    attempt_number INT DEFAULT 1,
+    time_spent_seconds INT NULL,
+    user_input TEXT NULL,
+    expected_solution TEXT NULL,
+    is_correct BOOLEAN NULL,
+    hint_index INT NULL,
+    session_id VARCHAR(100) NULL,
+    user_agent TEXT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (puzzle_id) REFERENCES puzzles(puzzle_id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_puzzle_id (puzzle_id),
+    INDEX idx_action_type (action_type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_session_id (session_id)
+);
+
+-- Mission-Interaktionen-Log
+CREATE TABLE IF NOT EXISTS mission_interaction_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    mission_id VARCHAR(100) NOT NULL,
+    action_type ENUM('started', 'puzzle_completed', 'mission_completed', 'abandoned', 'failed') NOT NULL,
+    puzzle_id VARCHAR(100) NULL,
+    time_spent_seconds INT NULL,
+    session_id VARCHAR(100) NULL,
+    user_agent TEXT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (mission_id) REFERENCES missions(mission_id) ON DELETE CASCADE,
+    FOREIGN KEY (puzzle_id) REFERENCES puzzles(puzzle_id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_mission_id (mission_id),
+    INDEX idx_action_type (action_type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_session_id (session_id)
+);
+
+-- Raum-Besuche-Log
+CREATE TABLE IF NOT EXISTS room_visit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    room_id VARCHAR(100) NOT NULL,
+    action_type ENUM('entered', 'exited', 'interacted_with_object', 'picked_item') NOT NULL,
+    object_id VARCHAR(100) NULL,
+    item_id VARCHAR(100) NULL,
+    time_spent_seconds INT NULL,
+    session_id VARCHAR(100) NULL,
+    user_agent TEXT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (room_id) REFERENCES rooms(room_id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_room_id (room_id),
+    INDEX idx_action_type (action_type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_session_id (session_id)
+);
+
+-- Spieler-Sessions-Log
+CREATE TABLE IF NOT EXISTS player_session_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    session_id VARCHAR(100) UNIQUE NOT NULL,
+    session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    session_end TIMESTAMP NULL,
+    total_playtime_seconds INT DEFAULT 0,
+    puzzles_attempted INT DEFAULT 0,
+    puzzles_solved INT DEFAULT 0,
+    missions_started INT DEFAULT 0,
+    missions_completed INT DEFAULT 0,
+    rooms_visited INT DEFAULT 0,
+    items_collected INT DEFAULT 0,
+    bitcoins_earned DECIMAL(10,8) DEFAULT 0.00000000,
+    exp_earned INT DEFAULT 0,
+    user_agent TEXT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_session_id (session_id),
+    INDEX idx_session_start (session_start),
+    INDEX idx_session_end (session_end)
+);
+
+-- ========================================
 -- VIEWS ERSTELLEN
 -- ========================================
 
@@ -854,6 +954,95 @@ FROM puzzles p
 JOIN rooms r ON p.room_id = r.room_id
 LEFT JOIN missions m ON r.mission_id = m.mission_id
 ORDER BY m.required_level, r.required_level, p.difficulty;
+
+-- Analytics-Views für Dashboard
+CREATE OR REPLACE VIEW puzzle_analytics AS
+SELECT 
+    p.puzzle_id,
+    p.name,
+    p.puzzle_type,
+    p.difficulty,
+    r.name as room_name,
+    m.name as mission_name,
+    pil.created_at,
+    COUNT(pil.id) as total_interactions,
+    COUNT(CASE WHEN pil.action_type = 'started' THEN 1 END) as times_started,
+    COUNT(CASE WHEN pil.action_type = 'attempted' THEN 1 END) as total_attempts,
+    COUNT(CASE WHEN pil.action_type = 'failed' THEN 1 END) as failed_attempts,
+    COUNT(CASE WHEN pil.action_type = 'solved' THEN 1 END) as times_solved,
+    COUNT(CASE WHEN pil.action_type = 'skipped' THEN 1 END) as times_skipped,
+    COUNT(CASE WHEN pil.action_type = 'timeout' THEN 1 END) as times_timeout,
+    COUNT(CASE WHEN pil.action_type = 'hint_used' THEN 1 END) as hints_used,
+    COUNT(CASE WHEN pil.action_type = 'abandoned' THEN 1 END) as times_abandoned,
+    AVG(CASE WHEN pil.time_spent_seconds IS NOT NULL THEN pil.time_spent_seconds END) as avg_time_seconds,
+    COUNT(DISTINCT pil.user_id) as unique_users,
+    ROUND(
+        (COUNT(DISTINCT CASE WHEN pil.action_type = 'solved' THEN pil.user_id END) * 100.0) / 
+        NULLIF(COUNT(DISTINCT CASE WHEN pil.action_type IN ('started', 'attempted', 'solved') THEN pil.user_id END), 0), 2
+    ) as success_rate_percent
+FROM puzzles p
+JOIN rooms r ON p.room_id = r.room_id
+LEFT JOIN missions m ON r.mission_id = m.mission_id
+LEFT JOIN puzzle_interaction_logs pil ON p.puzzle_id = pil.puzzle_id
+GROUP BY p.puzzle_id, p.name, p.puzzle_type, p.difficulty, r.name, m.name, pil.created_at
+ORDER BY failed_attempts DESC, success_rate_percent ASC;
+
+-- Mission-Analytics
+CREATE OR REPLACE VIEW mission_analytics AS
+SELECT 
+    m.mission_id,
+    m.name,
+    m.difficulty,
+    m.reward_bitcoins,
+    m.reward_exp,
+    mil.created_at,
+    COUNT(mil.id) as total_interactions,
+    COUNT(CASE WHEN mil.action_type = 'started' THEN 1 END) as times_started,
+    COUNT(CASE WHEN mil.action_type = 'mission_completed' THEN 1 END) as times_completed,
+    COUNT(CASE WHEN mil.action_type = 'abandoned' THEN 1 END) as times_abandoned,
+    COUNT(CASE WHEN mil.action_type = 'failed' THEN 1 END) as times_failed,
+    COUNT(DISTINCT mil.user_id) as unique_users,
+    AVG(CASE WHEN mil.time_spent_seconds IS NOT NULL THEN mil.time_spent_seconds END) as avg_time_seconds,
+    ROUND(
+        (COUNT(CASE WHEN mil.action_type = 'mission_completed' THEN 1 END) * 100.0) / 
+        NULLIF(COUNT(CASE WHEN mil.action_type = 'started' THEN 1 END), 0), 2
+    ) as completion_rate_percent
+FROM missions m
+LEFT JOIN mission_interaction_logs mil ON m.mission_id = mil.mission_id
+GROUP BY m.mission_id, m.name, m.difficulty, m.reward_bitcoins, m.reward_exp, mil.created_at
+ORDER BY completion_rate_percent ASC, times_started DESC;
+
+-- Spieler-Performance-Analytics
+CREATE OR REPLACE VIEW player_performance_analytics AS
+SELECT 
+    u.id,
+    u.username,
+    u.created_at AS user_created_at,
+    psl.created_at AS session_created_at,
+    COUNT(DISTINCT psl.session_id) as total_sessions,
+    SUM(psl.total_playtime_seconds) as total_playtime_seconds,
+    SUM(psl.puzzles_attempted) as total_puzzles_attempted,
+    SUM(psl.puzzles_solved) as total_puzzles_solved,
+    SUM(psl.missions_started) as total_missions_started,
+    SUM(psl.missions_completed) as total_missions_completed,
+    SUM(psl.rooms_visited) as total_rooms_visited,
+    SUM(psl.items_collected) as total_items_collected,
+    SUM(psl.bitcoins_earned) as total_bitcoins_earned,
+    SUM(psl.exp_earned) as total_exp_earned,
+    AVG(psl.total_playtime_seconds) as avg_session_duration_seconds,
+    ROUND(
+        (SUM(psl.puzzles_solved) * 100.0) / 
+        NULLIF(SUM(psl.puzzles_attempted), 0), 2
+    ) as puzzle_success_rate_percent,
+    ROUND(
+        (SUM(psl.missions_completed) * 100.0) / 
+        NULLIF(SUM(psl.missions_started), 0), 2
+    ) as mission_success_rate_percent
+FROM users u
+LEFT JOIN player_session_logs psl ON u.id = psl.user_id
+WHERE u.is_active = TRUE
+GROUP BY u.id, u.username, user_created_at, session_created_at
+ORDER BY total_playtime_seconds DESC;
 
 -- ========================================
 -- BESTÄTIGUNG

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuerySingle, executeQuery, executeTransaction, executeTransactionCommand } from '@/lib/database';
 import crypto from 'crypto';
+import { addPuzzleInteractionLog } from '@/lib/services/puzzle-service';
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,8 @@ export async function POST(
       const { puzzleId } = await params;
       const body = await request.json();
       const { answer, timeSpent } = body;
+      const userAgent = request.headers.get('user-agent') || null;
+      const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
 
       if (!puzzleId || answer === undefined) {
         return NextResponse.json({
@@ -74,6 +77,18 @@ export async function POST(
 
       // Prüfen ob bereits gelöst
       if (progress?.is_completed) {
+        // Analytics: Log skipped
+        await addPuzzleInteractionLog({
+          userId,
+          puzzleId,
+          actionType: 'skipped',
+          attemptNumber: progress.attempts,
+          timeSpentSeconds: timeSpent || null,
+          userInput: JSON.stringify(answer),
+          isCorrect: true,
+          userAgent,
+          ipAddress
+        });
         // Mission-Completion-Logik auch bei bereits gelöstem Rätsel ausführen!
         // Prüfen ob alle Rätsel der Mission gelöst wurden
         const missionPuzzles = await executeQuery<{puzzle_id: string, is_required: boolean}>(
@@ -274,6 +289,19 @@ export async function POST(
           isCorrect = answer.toString() === solutionData.expected_input?.toString();
           validationMessage = isCorrect ? 'Antwort korrekt!' : 'Antwort falsch';
       }
+
+      // Analytics: Log solved/failed/attempted
+      await addPuzzleInteractionLog({
+        userId,
+        puzzleId,
+        actionType: isCorrect ? 'solved' : (currentAttempts >= puzzle.max_attempts ? 'failed' : 'attempted'),
+        attemptNumber: currentAttempts + 1,
+        timeSpentSeconds: timeSpent || null,
+        userInput: JSON.stringify(answer),
+        isCorrect,
+        userAgent,
+        ipAddress
+      });
 
       // Transaktion starten
       const transactionQueries = [];

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { executeQuery, executeUpdate } from '@/lib/database';
 import { verifyToken } from '@/lib/auth';
 import { getUserById } from '@/lib/services/auth-service';
+import { addPuzzleInteractionLog } from '@/lib/services/puzzle-service';
 
 interface SolveRequest {
   puzzleId: string;
@@ -116,22 +117,45 @@ export async function POST(request: NextRequest) {
       completed_at: null
     };
 
+    const userAgent = request.headers.get('user-agent') || null;
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null;
+
     // Prüfen ob Rätsel bereits gelöst
     if (currentProgress.is_completed) {
+      // Analytics: Log skipped
+      await addPuzzleInteractionLog({
+        userId: dbUser.id,
+        puzzleId,
+        actionType: 'skipped',
+        attemptNumber: currentProgress.attempts,
+        timeSpentSeconds: timeSpent || null,
+        userInput: JSON.stringify(answer),
+        isCorrect: true,
+        userAgent,
+        ipAddress
+      });
       return NextResponse.json({
         success: true,
         isCorrect: true,
         attempts: currentProgress.attempts,
         message: 'Rätsel bereits gelöst',
-        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
-        // rewardExp: puzzle.reward_exp,
-        // rewardBitcoins: parseFloat(puzzle.reward_bitcoins || '0'),
-        // rewardItems: JSON.parse(puzzle.reward_items || '[]')
       });
     }
 
     // Prüfen ob maximale Versuche erreicht
     if (currentProgress.attempts >= puzzle.max_attempts) {
+      // Analytics: Log abandoned
+      await addPuzzleInteractionLog({
+        userId: dbUser.id,
+        puzzleId,
+        actionType: 'abandoned',
+        attemptNumber: currentProgress.attempts,
+        timeSpentSeconds: timeSpent || null,
+        userInput: JSON.stringify(answer),
+        isCorrect: false,
+        userAgent,
+        ipAddress
+      });
       return NextResponse.json({
         success: false,
         error: 'Maximale Anzahl Versuche erreicht',
@@ -161,15 +185,18 @@ export async function POST(request: NextRequest) {
         END
       `, [dbUser.id, puzzleId, newAttempts, timeSpent || null, newAttempts, timeSpent || 0, timeSpent || 0]);
 
-      // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
-      // await executeUpdate(`
-      //   UPDATE game_states 
-      //   SET 
-      //     experience_points = experience_points + ?,
-      //     bitcoins = bitcoins + ?,
-      //     progress = JSON_SET(progress, CONCAT('$.', ?), JSON_OBJECT('completed', TRUE, 'completed_at', NOW()))
-      //   WHERE user_id = ?
-      // `, [puzzle.reward_exp || 0, parseFloat(puzzle.reward_bitcoins || '0'), puzzleId, dbUser.id]);
+      // Analytics: Log solved
+      await addPuzzleInteractionLog({
+        userId: dbUser.id,
+        puzzleId,
+        actionType: 'solved',
+        attemptNumber: newAttempts,
+        timeSpentSeconds: timeSpent || null,
+        userInput: JSON.stringify(answer),
+        isCorrect: true,
+        userAgent,
+        ipAddress
+      });
 
       // Erfolgs-Response
       const response: SolveResponse = {
@@ -177,10 +204,6 @@ export async function POST(request: NextRequest) {
         isCorrect: true,
         attempts: newAttempts,
         message: 'Rätsel erfolgreich gelöst!',
-        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
-        // rewardExp: puzzle.reward_exp,
-        // rewardBitcoins: parseFloat(puzzle.reward_bitcoins || '0'),
-        // rewardItems: JSON.parse(puzzle.reward_items || '[]')
       };
 
       return NextResponse.json(response);
@@ -193,6 +216,19 @@ export async function POST(request: NextRequest) {
         ON DUPLICATE KEY UPDATE
         attempts = ?
       `, [dbUser.id, puzzleId, newAttempts, newAttempts]);
+
+      // Analytics: Log failed/attempted
+      await addPuzzleInteractionLog({
+        userId: dbUser.id,
+        puzzleId,
+        actionType: newAttempts >= puzzle.max_attempts ? 'failed' : 'attempted',
+        attemptNumber: newAttempts,
+        timeSpentSeconds: timeSpent || null,
+        userInput: JSON.stringify(answer),
+        isCorrect: false,
+        userAgent,
+        ipAddress
+      });
 
       // Hinweise abrufen
       const hintsQuery = `
