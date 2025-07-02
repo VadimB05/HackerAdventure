@@ -466,8 +466,6 @@ export default function PuzzlesPage() {
                 difficulty: editingPuzzle.difficulty,
                 maxAttempts: editingPuzzle.maxAttempts,
                 timeLimitSeconds: editingPuzzle.timeLimitSeconds,
-                rewardMoney: 0,
-                rewardExp: 0,
                 isRequired: editingPuzzle.isRequired,
                 isHidden: editingPuzzle.isHidden,
                 hints: [],
