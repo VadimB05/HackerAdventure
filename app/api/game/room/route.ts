@@ -224,7 +224,9 @@ export async function GET(request: NextRequest) {
         roomId: roomData.room_id,
         name: roomData.name,
         description: roomData.description,
-        backgroundImage: roomData.background_image,
+        backgroundImage: roomData.background_image 
+          ? `/uploads/${roomData.background_image}`
+          : '/uploads/room-bedroom.png',
         ambientSound: roomData.ambient_sound,
         isLocked: roomData.is_locked,
         requiredLevel: roomData.required_level,

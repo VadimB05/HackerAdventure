@@ -157,7 +157,9 @@ export async function GET(
         };
       });
 
-      const backgroundPath = room.background_image ? `/${room.background_image}` : '/room-bedroom.png';
+      const backgroundPath = room.background_image 
+        ? `/uploads/${room.background_image}`
+        : '/uploads/room-bedroom.png';
       
       const roomData = {
         id: room.room_id,

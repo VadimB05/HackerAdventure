@@ -199,17 +199,20 @@ export default function RoomView({
   // Prüfen ob Missionen abgeschlossen sind
   const checkMissionCompletion = async () => {
     try {
+      console.log('[DEBUG] checkMissionCompletion: Starte Mission-Progress-Check');
       const response = await fetch('/api/game/progress');
       const data = await response.json();
       
       if (data.success) {
         const missionProgress = data.progress.missionProgress;
+        console.log('[DEBUG] checkMissionCompletion: Mission-Progress geladen:', missionProgress);
         
         // Sammle alle abgeschlossenen Missionen
         const completed = new Set<string>();
         missionProgress.forEach((m: any) => {
           if (m.isCompleted) {
             completed.add(m.missionId);
+            console.log('[DEBUG] checkMissionCompletion: Mission abgeschlossen:', m.missionId);
           }
         });
         
@@ -223,11 +226,46 @@ export default function RoomView({
           setMissionCompleted(false);
         }
         
-        console.log('Completed missions:', Array.from(completed));
+        console.log('[DEBUG] checkMissionCompletion: Completed missions:', Array.from(completed));
+      } else {
+        console.error('[DEBUG] checkMissionCompletion: API-Fehler:', data.error);
       }
     } catch (error) {
-      console.error('Error checking mission completion:', error);
+      console.error('[DEBUG] checkMissionCompletion: Netzwerkfehler:', error);
       setMissionCompleted(false);
+    }
+  };
+
+  // Neue Funktion: Prüfe spezifische Mission-Status
+  const checkSpecificMissionStatus = async (missionId: string): Promise<boolean> => {
+    try {
+      console.log('[DEBUG] checkSpecificMissionStatus: Prüfe Mission:', missionId);
+      
+      // Direkte Abfrage der Mission-Progress-Daten
+      const response = await fetch(`/api/game/progress/mission`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          missionId: missionId,
+          stepId: 'check'
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('[DEBUG] checkSpecificMissionStatus: Response:', data);
+      
+      if (data.success) {
+        const isCompleted = data.isCompleted || false;
+        console.log('[DEBUG] checkSpecificMissionStatus: Mission abgeschlossen?', isCompleted);
+        return isCompleted;
+      } else {
+        console.error('[DEBUG] checkSpecificMissionStatus: API-Fehler:', data.error);
+        return false;
+      }
+    } catch (error) {
+      console.error('[DEBUG] checkSpecificMissionStatus: Netzwerkfehler:', error);
+      return false;
     }
   };
 
@@ -735,25 +773,18 @@ export default function RoomView({
     
     // Puzzle-Objekte behandeln
     if (object.type === 'puzzle') {
-      // Mission-Logik NUR für Computer/Server-Computer
-      if (object.id === 'computer' || object.id === 'server_computer') {
-        // ... Mission-Logik wie bisher ...
-        let missionId = "mission1_crypto_bank"; // Fallback
-        if (roomId === 'building1_server_farm') {
-          missionId = "mission2_server_farm";
-        } else if (roomId === 'building2_office') {
-          missionId = "mission3_office";
-        } else if (roomId === 'building3_lab') {
-          missionId = "mission4_lab";
-        } else if (roomId === 'building4_warehouse') {
-          missionId = "mission5_warehouse";
-        } else if (roomId === 'building5_penthouse') {
-          missionId = "mission6_penthouse";
-        }
-        if (completedMissions.size === 0) {
-          await checkMissionCompletion();
-        }
-        const isCurrentMissionCompleted = completedMissions.has(missionId);
+      console.log('[DEBUG] handleObjectClick: Puzzle-Objekt angeklickt:', object.id);
+      console.log('[DEBUG] handleObjectClick: Raum-Daten:', roomData);
+      
+      // Dynamische Mission-Logik: Prüfe ob der aktuelle Raum zu einer Mission gehört
+      if (roomData?.missionId) {
+        const missionId = roomData.missionId;
+        console.log('[DEBUG] handleObjectClick: Mission-ID gefunden:', missionId);
+        
+        // Spezifische Mission-Status-Prüfung für bessere Genauigkeit
+        const isCurrentMissionCompleted = await checkSpecificMissionStatus(missionId);
+        console.log('[DEBUG] handleObjectClick: Mission abgeschlossen?', isCurrentMissionCompleted);
+        
         if (isCurrentMissionCompleted) {
           const rect = document.querySelector(`[data-object-id="${object.id}"]`)?.getBoundingClientRect();
           const position = rect ? {
@@ -771,7 +802,9 @@ export default function RoomView({
         }
         return;
       }
-      // Sonstige Puzzle-Objekte: Standard-Logik oder onObjectClick-Callback
+      
+      console.log('[DEBUG] handleObjectClick: Keine Mission-ID gefunden, verwende Standard-Logik');
+      // Fallback: Standard-Logik für Räume ohne Mission
       onObjectClick?.(object);
       return;
     }

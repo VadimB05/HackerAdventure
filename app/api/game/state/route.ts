@@ -112,7 +112,9 @@ export async function GET(request: NextRequest) {
         roomId: currentRoomData.room_id,
         name: currentRoomData.name,
         description: currentRoomData.description,
-        backgroundImage: currentRoomData.background_image,
+        backgroundImage: currentRoomData.background_image 
+          ? `/uploads/${currentRoomData.background_image}`
+          : '/uploads/room-bedroom.png',
         ambientSound: currentRoomData.ambient_sound,
         connections: JSON.parse(currentRoomData.connections || '{}'),
         requiredLevel: currentRoomData.required_level,
