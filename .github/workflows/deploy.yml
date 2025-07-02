@@ -31,7 +31,7 @@ jobs:
         echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
         
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: pnpm install
       env:
         PNPM_HOME: ${{ github.workspace }}/.pnpm
       
