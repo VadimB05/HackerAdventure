@@ -1,0 +1,56 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: intrusion
+          MYSQL_USER: intrusion
+          MYSQL_PASSWORD: intrusion
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm install -g pnpm
+      - run: pnpm install
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm lint
+
+  docker-build:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Backend Docker image
+        run: docker build -t intrusion-backend .
+      - name: Build Frontend Docker image
+        run: docker build -f Dockerfile.frontend -t intrusion-frontend .
+      - name: Test Docker Compose
+        run: docker-compose up -d --build
+      - name: Wait for services
+        run: sleep 30
+      - name: Check if services are running
+        run: |
+          docker-compose ps
+          curl -f http://localhost:3000 || exit 1
+          curl -f http://localhost:3001/api/health || exit 1 
