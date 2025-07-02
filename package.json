@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "setup-env": "node scripts/setup-env.js"
+    "setup-env": "node scripts/setup-env.js",
+    "setup-secrets": "node scripts/setup-github-secrets.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

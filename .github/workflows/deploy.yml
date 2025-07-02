@@ -1,0 +1,63 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 8
+        
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      
+    - name: Run type check
+      run: pnpm run type-check
+      
+    - name: Run linting
+      run: pnpm run lint
+      
+    - name: Build application
+      run: pnpm run build
+      env:
+        NODE_ENV: production
+        # Hier können weitere Umgebungsvariablen hinzugefügt werden
+        # DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        # JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        # CUSTOM_KEY: ${{ secrets.CUSTOM_KEY }}
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-files
+        path: .next/
+        retention-days: 1
+        
+    # Optional: Deployment-Schritt (hier als Beispiel für SSH-Deployment)
+    - name: Deploy to server
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        echo "Deployment würde hier stattfinden"
+        echo "Du kannst hier deine Deployment-Logik hinzufügen:"
+        echo "- SSH-Verbindung zum Server"
+        echo "- Dateien kopieren"
+        echo "- Service neu starten"
+        # Beispiel für SSH-Deployment:
+        # ssh user@your-server.com "cd /path/to/app && git pull && pnpm install && pnpm run build && pm2 restart app" 
