@@ -53,8 +53,6 @@ export default function PuzzleSystem({
               difficulty: puzzle.difficulty,
               maxAttempts: puzzle.maxAttempts,
               timeLimitSeconds: puzzle.timeLimitSeconds,
-              rewardMoney: puzzle.rewardMoney || 0.0001,
-              rewardExp: puzzle.rewardExp,
               isRequired: puzzle.isRequired || false,
               isHidden: puzzle.isHidden || false,
               hints: puzzle.hints || [],

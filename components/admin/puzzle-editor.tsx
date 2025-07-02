@@ -20,8 +20,6 @@ interface PuzzleData {
   difficulty: number;
   maxAttempts: number;
   timeLimitSeconds?: number;
-  rewardMoney: number;
-  rewardExp: number;
   isRequired: boolean;
   isHidden: boolean;
   hints: string[];
@@ -46,8 +44,6 @@ export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle, 
     difficulty: 1,
     maxAttempts: 3,
     timeLimitSeconds: undefined,
-    rewardMoney: 0,
-    rewardExp: 0,
     isRequired: false,
     isHidden: false,
     hints: [''],
@@ -451,10 +447,9 @@ export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle, 
       
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">Allgemein</TabsTrigger>
             <TabsTrigger value="content">Inhalt</TabsTrigger>
-            <TabsTrigger value="rewards">Belohnungen</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -630,49 +625,7 @@ export default function PuzzleEditor({ roomId, onSave, onCancel, initialPuzzle, 
             </div>
           </TabsContent>
 
-          <TabsContent value="rewards" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="rewardMoney">Geld-Belohnung</Label>
-                <Input
-                  id="rewardMoney"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={puzzle.rewardMoney}
-                  onChange={(e) => handleInputChange('rewardMoney', parseFloat(e.target.value) || 0)}
-                />
-              </div>
 
-              <div>
-                <Label htmlFor="rewardExp">Erfahrungspunkte</Label>
-                <Input
-                  id="rewardExp"
-                  type="number"
-                  min="0"
-                  value={puzzle.rewardExp}
-                  onChange={(e) => handleInputChange('rewardExp', parseInt(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Item-Belohnungen</Label>
-              <Textarea
-                value={JSON.stringify(puzzle.data.rewardItems || [], null, 2)}
-                onChange={(e) => {
-                  try {
-                    const items = JSON.parse(e.target.value);
-                    handleDataChange('rewardItems', items);
-                  } catch {
-                    // Ignore invalid JSON
-                  }
-                }}
-                placeholder='["item_id_1", "item_id_2"]'
-                rows={3}
-              />
-            </div>
-          </TabsContent>
         </Tabs>
 
         <div className="flex justify-end gap-2 mt-6">

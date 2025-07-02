@@ -55,7 +55,7 @@ export default function TerminalMission() {
         setOutput((prev) => [...prev, ...simulatedOutput])
 
         // Gehe zum nächsten Befehl
-        if (currentCommandIndex < mission.commands.length - 1) {
+        if (mission.commands && currentCommandIndex < mission.commands.length - 1) {
           setCurrentCommandIndex((prev) => prev + 1)
         } else {
           // Mission abgeschlossen
@@ -192,7 +192,7 @@ export default function TerminalMission() {
   // Nur fortfahren, wenn es eine Terminal-Mission ist
   if (!isTerminalMission) return null
 
-  const currentCommand = mission.commands[currentCommandIndex]
+  const currentCommand = mission.commands?.[currentCommandIndex]
 
   return (
     <Dialog open={!!currentMission && isTerminalMission} onOpenChange={() => {}}>
@@ -271,12 +271,12 @@ export default function TerminalMission() {
             </div>
             <div className="flex items-center">
               <span className="text-sm text-green-700 mr-2">
-                Fortschritt: {currentCommandIndex + 1}/{mission.commands.length}
+                Fortschritt: {currentCommandIndex + 1}/{mission.commands?.length || 0}
               </span>
               <div className="w-32 h-2 bg-gray-900 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-green-600"
-                  style={{ width: `${((currentCommandIndex + 1) / mission.commands.length) * 100}%` }}
+                  style={{ width: `${((currentCommandIndex + 1) / (mission.commands?.length || 1)) * 100}%` }}
                 ></div>
               </div>
             </div>
