@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Monitor, SmartphoneIcon, MessageSquare, Home, Server, MapPin } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getInventory, type InventoryItem } from "@/lib/services/inventory-service"
+import PuzzleSystem from "./puzzle-system"
 
 interface GameLayoutProps {
   onIntroModalComplete?: () => void;
@@ -37,6 +38,10 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
   // Intro Modal State
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [introModalChecked, setIntroModalChecked] = useState(false);
+
+  // Puzzle State
+  const [currentPuzzleId, setCurrentPuzzleId] = useState<string | null>(null);
+  const [showPuzzle, setShowPuzzle] = useState(false);
 
   // Prüfe IntroModal-Status beim Laden
   useEffect(() => {
@@ -188,6 +193,35 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
     }
   };
 
+  // Objekt-Klick-Handler für Puzzle-Objekte
+  const handleObjectClick = (object: any) => {
+    console.log('Object clicked in GameLayout:', object.id, object.type, object.puzzleId);
+    
+    if (object.type === 'puzzle' && object.puzzleId) {
+      console.log('Opening puzzle:', object.puzzleId);
+      setCurrentPuzzleId(object.puzzleId);
+      setShowPuzzle(true);
+    }
+  };
+
+  // Puzzle-Lösungs-Handler
+  const handlePuzzleSolve = (puzzleId: string, isCorrect: boolean) => {
+    console.log('Puzzle solved:', puzzleId, 'Correct:', isCorrect);
+    setShowPuzzle(false);
+    setCurrentPuzzleId(null);
+    
+    if (isCorrect) {
+      // Hier könnte man Belohnungen geben oder andere Aktionen ausführen
+      console.log('Puzzle erfolgreich gelöst!');
+    }
+  };
+
+  // Puzzle schließen
+  const handlePuzzleClose = () => {
+    setShowPuzzle(false);
+    setCurrentPuzzleId(null);
+  };
+
   // Bestimme den aktuellen Raum basierend auf der View
   const getCurrentRoomId = () => {
     switch (currentView) {
@@ -294,6 +328,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
             onItemUse={handleItemUse}
             onInventoryUpdate={handleInventoryUpdate}
             onRoomChange={handleRoomChange}
+            onObjectClick={handleObjectClick}
           />
         )}
         {currentView === "basement" && <Basement />}
@@ -304,6 +339,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
             onItemUse={handleItemUse}
             onInventoryUpdate={handleInventoryUpdate}
             onRoomChange={handleRoomChange}
+            onObjectClick={handleObjectClick}
           />
         )}
       </main>
@@ -322,6 +358,16 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
       <TerminalMission />
       <MoneyPopup />
       <GameOverScreen />
+      
+      {/* Puzzle System */}
+      {showPuzzle && currentPuzzleId && (
+        <PuzzleSystem
+          puzzleId={currentPuzzleId}
+          onSolve={handlePuzzleSolve}
+          onClose={handlePuzzleClose}
+          useDebugApi={false}
+        />
+      )}
     </div>
   )
 }
