@@ -150,7 +150,7 @@ export default function HackingMission() {
                   )}
                   {currentStepIndex === 1 && (
                     <div className="font-mono text-sm">
-                      <p>admin@192.168.1.100's password: *********</p>
+                      <p>admin@192.168.1.100&apos;s password: *********</p>
                       <p>Last login: Wed May 1 14:22:31 2024 from 192.168.1.5</p>
                       <p className="text-green-400">Connection established to ISP-DB-Server</p>
                       <p>admin@ISP-DB-Server:~$ </p>
@@ -179,7 +179,7 @@ export default function HackingMission() {
                   {currentStepIndex === 4 && (
                     <div className="font-mono text-sm">
                       <p>Enter password: *********</p>
-                      <p className="text-green-400">Dumping data for table 'users'</p>
+                      <p className="text-green-400">Dumping data for table &apos;users&apos;</p>
                       <p>Data exported successfully to volkov_data.sql</p>
                       <p className="text-yellow-400">Mission complete! Data extracted successfully.</p>
                       <p className="text-yellow-400">Reward: 0.15 BTC has been transferred to your wallet.</p>

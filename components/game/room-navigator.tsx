@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '@/lib/contexts/game-context';
 import RoomView from './room-view';
@@ -36,7 +36,7 @@ export default function RoomNavigator({
   const [showMap, setShowMap] = useState(false);
 
   // Raum laden
-  const loadRoom = async (roomId: string) => {
+  const loadRoom = useCallback(async (roomId: string) => {
     setIsLoading(true);
     setError(null);
     
@@ -55,14 +55,14 @@ export default function RoomNavigator({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadRoomData, onRoomChange]);
 
   // Initialen Raum laden
   useEffect(() => {
     if (currentRoomId) {
       loadRoom(currentRoomId);
     }
-  }, []);
+  }, [currentRoomId, loadRoom]);
 
   // Raumwechsel-Handler
   const handleExitClick = async (exitId: string) => {

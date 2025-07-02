@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import PuzzleSystem from './puzzle-system';
@@ -51,19 +51,7 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
     }
   }, [alarmLevel, lastAlarmLevel]);
 
-  useEffect(() => {
-    if (isOpen) {
-      // Reset state when opening modal
-      setCurrentStep(0);
-      setPuzzleProgress({});
-      setIsCompleted(false);
-      setShowPuzzle(false);
-      setError(null);
-      fetchMission();
-    }
-  }, [isOpen, missionId]);
-
-  const fetchMission = async () => {
+  const fetchMission = useCallback(async () => {
     setIsLoading(true);
     try {
       // Mission laden
@@ -154,7 +142,19 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [missionId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Reset state when opening modal
+      setCurrentStep(0);
+      setPuzzleProgress({});
+      setIsCompleted(false);
+      setShowPuzzle(false);
+      setError(null);
+      fetchMission();
+    }
+  }, [isOpen, missionId, fetchMission]);
 
   const handleNextStep = async () => {
     if (!mission) return;

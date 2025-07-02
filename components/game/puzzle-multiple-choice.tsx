@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,29 +87,8 @@ export default function PuzzleMultipleChoice({
     }
   }, [puzzleData?.timeLimitSeconds, puzzleData?.progress.isCompleted]);
 
-  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
-  useEffect(() => {
-    if (alarmLevel > lastAlarmLevel) {
-      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
-      setLastAlarmLevel(alarmLevel);
-      
-      // Versuche zurücksetzen
-      resetPuzzleAttempts();
-      
-      // Rätsel NICHT schließen - nur Versuche zurücksetzen
-      // Das Rätsel soll weiter spielbar bleiben
-    }
-  }, [alarmLevel, lastAlarmLevel]);
-
-  // Zeit abgelaufen
-  useEffect(() => {
-    if (timeRemaining === 0) {
-      handleSubmit(''); // Leere Antwort bei Zeitablauf
-    }
-  }, [timeRemaining]);
-
   // Versuche in der Datenbank zurücksetzen
-  const resetPuzzleAttempts = async () => {
+  const resetPuzzleAttempts = useCallback(async () => {
     try {
       const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
         method: 'POST',
@@ -139,34 +118,67 @@ export default function PuzzleMultipleChoice({
     } catch (error) {
       console.error('Fehler beim Zurücksetzen der Versuche:', error);
     }
-  };
-
-  useEffect(() => {
-    if (puzzleData) {
-      // Versuche aus der API-Response laden
-      const attemptsFromApi = puzzleData.progress?.attempts || 0;
-      console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
-      setAttempts(attemptsFromApi);
-      setMaxAttempts(puzzleData.maxAttempts);
-    }
-  }, [puzzleData]);
-
-  // Lade Puzzle-Daten beim ersten Laden
-  useEffect(() => {
-    loadPuzzle();
   }, [puzzleId]);
 
-  // Reset alle States beim Öffnen des Rätsels
-  useEffect(() => {
-    if (puzzleId) {
-      console.log('[DEBUG] Rätsel geöffnet - setze alle States zurück');
-      setShowResult(false);
-      setIsCorrect(false);
-      setSelectedAnswer('');
-    }
-  }, [puzzleId]);
+  const handleSubmit = useCallback(async (answer?: string) => {
+    if (!puzzleData || isSubmitting || attempts >= maxAttempts) return;
 
-  const loadPuzzle = async () => {
+    const finalAnswer = answer !== undefined ? answer : selectedAnswer;
+    if (!finalAnswer) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/solve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          answer: finalAnswer,
+          timeSpent: puzzleData.timeLimitSeconds ? puzzleData.timeLimitSeconds - (timeRemaining || 0) : undefined
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setIsCorrect(data.isCorrect);
+        setAttempts(data.attempts);
+        setShowResult(true);
+        
+        if (data.isCorrect) {
+          // Alarm-Level erhöhen bei korrekter Antwort
+          increaseAlarmLevel();
+          
+          // Kurze Verzögerung vor dem Schließen
+          setTimeout(() => {
+            onSolve(puzzleId, true);
+          }, 2000);
+        } else {
+          // Bei falscher Antwort Alarm-Level erhöhen
+          increaseAlarmLevel();
+          
+          // Kurze Verzögerung vor dem Zurücksetzen
+          setTimeout(() => {
+            setShowResult(false);
+            setSelectedAnswer('');
+          }, 2000);
+        }
+      } else {
+        console.error('Fehler beim Lösen des Rätsels:', data.error);
+        setError(data.error || 'Unbekannter Fehler beim Lösen des Rätsels');
+      }
+    } catch (error) {
+      console.error('Netzwerkfehler:', error);
+      setError('Netzwerkfehler beim Lösen des Rätsels');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [puzzleData, isSubmitting, attempts, maxAttempts, selectedAnswer, puzzleId, timeRemaining, increaseAlarmLevel, onSolve]);
+
+  const loadPuzzle = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -209,7 +221,7 @@ export default function PuzzleMultipleChoice({
       console.log(`Lade Versuche aus API: ${attemptsFromApi}/${puzzle.maxAttempts}`);
       setAttempts(attemptsFromApi);
       setMaxAttempts(puzzle.maxAttempts);
-
+      
       setPuzzleData(puzzle);
       setRoomId(puzzle.roomId || 'intro');
 
@@ -219,67 +231,43 @@ export default function PuzzleMultipleChoice({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleId, initialPuzzleData]);
 
-  const handleSubmit = async (answer?: string) => {
-    const answerToSubmit = answer || selectedAnswer;
-    if (!answerToSubmit || isSubmitting) return;
-
-    // Prüfe ob maximale Versuche erreicht sind
-    if (attempts >= maxAttempts) {
-      increaseAlarmLevel('Maximale Versuche im Multiple-Choice-Rätsel erreicht');
-      return;
+  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
+  useEffect(() => {
+    if (alarmLevel > lastAlarmLevel) {
+      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
+      setLastAlarmLevel(alarmLevel);
+      
+      // Versuche zurücksetzen
+      resetPuzzleAttempts();
+      
+      // Rätsel NICHT schließen - nur Versuche zurücksetzen
+      // Das Rätsel soll weiter spielbar bleiben
     }
+  }, [alarmLevel, lastAlarmLevel, resetPuzzleAttempts]);
 
-    try {
-      setIsSubmitting(true);
+  // Zeit abgelaufen
+  useEffect(() => {
+    if (timeRemaining === 0) {
+      handleSubmit(''); // Leere Antwort bei Zeitablauf
+    }
+  }, [timeRemaining, handleSubmit]);
+
+  // Lade Puzzle-Daten beim ersten Laden
+  useEffect(() => {
+    loadPuzzle();
+  }, [loadPuzzle]);
+
+  // Reset alle States beim Öffnen des Rätsels
+  useEffect(() => {
+    if (puzzleId) {
+      console.log('[DEBUG] Rätsel geöffnet - setze alle States zurück');
       setShowResult(false);
-
-      const response = await fetch(`/api/game/puzzles/${puzzleId}/solve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ answer: answerToSubmit }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Versuche aktualisieren
-        setAttempts(data.attempts);
-
-        if (data.isCorrect) {
-          setIsCorrect(true);
-          setShowResult(true);
-          
-          setTimeout(() => {
-            onSolve(puzzleId, true);
-          }, 2000);
-        } else {
-          setIsCorrect(false);
-          setShowResult(true);
-          
-          // Prüfe ob maximale Versuche erreicht sind
-          if (data.maxAttemptsReached) {
-            increaseAlarmLevel('Maximale Versuche im Multiple-Choice-Rätsel erreicht');
-          }
-        }
-      } else {
-        // Prüfe ob es ein "Maximale Versuche" Fehler ist
-        if (data.error && data.error.includes('Maximale Anzahl Versuche')) {
-          increaseAlarmLevel('Maximale Versuche im Multiple-Choice-Rätsel erreicht');
-        } else {
-          console.error('Fehler beim Lösen des Rätsels:', data.error);
-        }
-      }
-    } catch (error) {
-      console.error('Fehler beim Lösen des Rätsels:', error);
-    } finally {
-      setIsSubmitting(false);
+      setIsCorrect(false);
+      setSelectedAnswer('');
     }
-  };
+  }, [puzzleId]);
 
   const handleHint = () => {
     if (puzzleData && currentHintIndex < (puzzleData.hints?.length || 0)) {

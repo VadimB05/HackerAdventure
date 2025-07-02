@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,11 +59,7 @@ export default function CitiesPage() {
     required_level: 1
   });
 
-  useEffect(() => {
-    loadCities();
-  }, []);
-
-  const loadCities = async () => {
+  const loadCities = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/cities');
       if (response.ok) {
@@ -86,7 +82,11 @@ export default function CitiesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadCities();
+  }, [loadCities]);
 
   const handleCreateCity = async () => {
     try {
@@ -384,7 +384,7 @@ export default function CitiesPage() {
                       <DialogHeader>
                         <DialogTitle className="text-white">Stadt bearbeiten</DialogTitle>
                         <DialogDescription className="text-gray-400">
-                          Bearbeite die Stadt "{city.name}"
+                          Bearbeite die Stadt &quot;{city.name}&quot;
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -461,7 +461,7 @@ export default function CitiesPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle className="text-white">Stadt löschen</AlertDialogTitle>
                         <AlertDialogDescription className="text-gray-400">
-                          Möchtest du die Stadt "{city.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                          Möchtest du die Stadt &quot;{city.name}&quot; wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

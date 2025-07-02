@@ -5,9 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Image, X, CheckCircle } from 'lucide-react';
+import { Upload, X, CheckCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getUploadUrl } from '@/lib/utils';
+import Image from 'next/image';
 
 interface ImageUploadProps {
   value: string;
@@ -155,22 +156,24 @@ export default function ImageUpload({ value, onChange, placeholder = "Bild ausw√
               <Tooltip key={image}>
                 <TooltipTrigger asChild>
                   <SelectItem value={image}>
-                                          <div className="flex items-center gap-2">
-                        <Image className="h-4 w-4" />
-                        {image}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      {image}
+                    </div>
                   </SelectItem>
                 </TooltipTrigger>
-                                        <TooltipContent side="right" className="p-0">
-                          <img 
-                            src={getUploadUrl(image)} 
-                            alt={image}
-                            className="w-10 h-10 object-cover rounded border"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        </TooltipContent>
+                <TooltipContent side="right" className="p-0">
+                  <Image 
+                    src={getUploadUrl(image)} 
+                    alt={image}
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 object-cover rounded border"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </TooltipContent>
               </Tooltip>
             ))}
           </SelectContent>
@@ -192,9 +195,11 @@ export default function ImageUpload({ value, onChange, placeholder = "Bild ausw√
             {/* Aktuelles Bild anzeigen */}
             {value && (
               <div className="relative inline-block">
-                <img 
+                <Image 
                   src={getUploadUrl(value)} 
                   alt="Vorschau" 
+                  width={128}
+                  height={128}
                   className="max-h-32 max-w-full rounded-lg border"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';

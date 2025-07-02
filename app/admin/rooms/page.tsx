@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -100,11 +100,7 @@ export default function RoomsPage() {
     ambient_sound: ''
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // Räume laden
       const roomsResponse = await fetch('/api/admin/rooms');
@@ -136,7 +132,11 @@ export default function RoomsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleCreateRoom = async () => {
     try {
@@ -510,7 +510,7 @@ export default function RoomsPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Raum löschen</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Möchtest du den Raum "{room.name}" wirklich löschen? 
+                            Möchtest du den Raum &quot;{room.name}&quot; wirklich löschen? 
                             Diese Aktion kann nicht rückgängig gemacht werden.
                           </AlertDialogDescription>
                         </AlertDialogHeader>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import DragDropFeedback from './drag-drop-feedback';
 import { pickItem, getRoomItems, useItem, type InventoryItem } from '@/lib/services/inventory-service';
 import { changeRoom, getGameProgress } from '@/lib/services/progress-service';
 import GuidedMissionModal from './GuidedMissionModal';
+import Image from 'next/image';
 
 interface InteractiveObject {
   id: string;
@@ -133,16 +134,7 @@ export default function RoomView({
     };
   }, []);
 
-  // Raum laden
-  useEffect(() => {
-    loadRoomData();
-    loadRoomItems();
-    loadGameProgress();
-    loadAvailableExits();
-    loadCityMissionStatus();
-  }, [roomId]);
-
-  const loadRoomData = async () => {
+  const loadRoomData = useCallback(async () => {
     setIsLoadingRoom(true);
     setRoomError(null);
     
@@ -167,9 +159,9 @@ export default function RoomView({
     } finally {
       setIsLoadingRoom(false);
     }
-  };
+  }, [roomId]);
 
-  const loadRoomItems = async () => {
+  const loadRoomItems = useCallback(async () => {
     try {
       const result = await getRoomItems(roomId);
       if (result.success && result.items) {
@@ -178,9 +170,9 @@ export default function RoomView({
     } catch (error) {
       console.error('Fehler beim Laden der Raum-Items:', error);
     }
-  };
+  }, [roomId]);
 
-  const loadGameProgress = async () => {
+  const loadGameProgress = useCallback(async () => {
     try {
       // TODO: Echte User-ID verwenden
       const userId = 1;
@@ -194,7 +186,7 @@ export default function RoomView({
     } catch (error) {
       console.error('Fehler beim Laden des Spieler-Fortschritts:', error);
     }
-  };
+  }, []);
 
   // Prüfen ob Missionen abgeschlossen sind
   const checkMissionCompletion = async () => {
@@ -296,74 +288,31 @@ export default function RoomView({
     }
   };
 
-  const loadCityMissionStatus = async () => {
-    // Für Intro-Raum: Prüfe mission1_crypto_bank Status
-    if (roomId === 'intro') {
-      try {
-        const response = await fetch(`/api/game/progress/mission`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            missionId: 'mission1_crypto_bank',
-            stepId: 'check'
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setCityMissionStatus({
-            allMissionsCompleted: data.isCompleted,
-            totalMissions: 1,
-            completedMissions: data.isCompleted ? 1 : 0,
-            missions: [{
-              missionId: 'mission1_crypto_bank',
-              buildingNumber: 1,
-              buildingName: 'Crypto Bank Mission',
-              isRequired: true,
-              isCompleted: data.isCompleted,
-              completedAt: data.isCompleted ? new Date().toISOString() : null
-            }]
-          });
-          console.log('Intro Mission Status geladen:', data);
-        } else {
-          console.error('Fehler beim Laden des Intro Mission Status:', data.error);
-        }
-      } catch (error) {
-        console.error('Netzwerkfehler beim Laden des Intro Mission Status:', error);
-      }
-      return;
-    }
-
-    // Nur laden wenn wir in einer Stadt sind (city1, city2, etc.)
-    if (!roomId.startsWith('city')) {
-      setCityMissionStatus(null);
-      return;
-    }
-
+  const loadCityMissionStatus = useCallback(async () => {
     try {
       const response = await fetch(`/api/game/city/${roomId}/missions-status`, {
         credentials: 'include'
       });
       
-      const data = await response.json();
-      
-      if (data.success) {
-        setCityMissionStatus({
-          allMissionsCompleted: data.allMissionsCompleted,
-          totalMissions: data.totalMissions,
-          completedMissions: data.completedMissions,
-          missions: data.missions
-        });
-        console.log('City Mission Status geladen:', data);
-      } else {
-        console.error('Fehler beim Laden des City Mission Status:', data.error);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCityMissionStatus(data.status);
+        }
       }
     } catch (error) {
-      console.error('Netzwerkfehler beim Laden des City Mission Status:', error);
+      console.error('Fehler beim Laden des City Mission Status:', error);
     }
-  };
+  }, [roomId]);
+
+  // Raum laden
+  useEffect(() => {
+    loadRoomData();
+    loadRoomItems();
+    loadGameProgress();
+    loadAvailableExits();
+    loadCityMissionStatus();
+  }, [loadRoomData, loadRoomItems, loadGameProgress, loadCityMissionStatus]);
 
   const clearFeedback = () => {
     setShowFeedback(false);
@@ -585,11 +534,18 @@ export default function RoomView({
         setIsUsingItem(true);
         
         // API-Aufruf für Item-Verwendung
-        const result = await useItem({
-          itemId: droppedItem.id,
-          targetObjectId: object.id,
-          roomId: roomId
-        });
+        const result = await fetch('/api/game/use-item', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            itemId: droppedItem.id,
+            targetObjectId: object.id,
+            roomId: roomId
+          }),
+        }).then(res => res.json());
 
         if (result.success) {
           // Erfolgreiche Interaktion
@@ -939,10 +895,11 @@ export default function RoomView({
           className="absolute inset-0"
         >
           {roomData.background ? (
-            <img
+            <Image
               src={roomData.background}
               alt={roomData.name}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">

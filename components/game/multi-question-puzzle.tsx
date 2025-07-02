@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,31 +40,7 @@ export default function MultiQuestionPuzzle({
   const currentQuestion = puzzleData?.questions[currentQuestionIndex];
   const selectedAnswer = currentQuestion ? (answers[currentQuestion.id] || '') : '';
 
-  // Rätsel laden
-  useEffect(() => {
-    loadPuzzle();
-  }, [puzzleId]);
-
-  // Timer für Zeitlimit
-  useEffect(() => {
-    if (puzzleData?.timeLimitSeconds && !puzzleData.progress.isCompleted) {
-      setTimeRemaining(puzzleData.timeLimitSeconds);
-      
-      const timer = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev === null || prev <= 0) {
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [puzzleData?.timeLimitSeconds, puzzleData?.progress.isCompleted]);
-
-  const loadPuzzle = async () => {
+  const loadPuzzle = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -84,7 +60,30 @@ export default function MultiQuestionPuzzle({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleId]);
+
+  useEffect(() => {
+    loadPuzzle();
+  }, [loadPuzzle]);
+
+  // Timer für Zeitlimit
+  useEffect(() => {
+    if (puzzleData?.timeLimitSeconds && !puzzleData.progress.isCompleted) {
+      setTimeRemaining(puzzleData.timeLimitSeconds);
+      
+      const timer = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev === null || prev <= 0) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [puzzleData?.timeLimitSeconds, puzzleData?.progress.isCompleted]);
 
   const handleAnswerChange = (answer: string) => {
     if (!currentQuestion) return;

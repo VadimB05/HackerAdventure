@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ export default function PuzzleCodeInput({
   // Timer für Zeitlimit
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     if (timeLimit && timeLimit > 0) {
       timerRef.current = setInterval(() => {
         setTimeRemaining(prev => {
@@ -58,7 +58,7 @@ export default function PuzzleCodeInput({
         });
       }, 1000);
     }
-  };
+  }, [timeLimit]);
 
   // Timer für Zeitlimit
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function PuzzleCodeInput({
   }, [puzzleData?.timeLimitSeconds, timeRemaining]);
 
   // Rätsel laden
-  const loadPuzzle = async () => {
+  const loadPuzzle = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -146,27 +146,33 @@ export default function PuzzleCodeInput({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleId, puzzleData, startTimer]);
 
-  useEffect(() => {
-    if (puzzleData) {
-      // Versuche aus der API-Response laden
-      const attemptsFromApi = puzzleData.progress?.attempts || 0;
-      console.log(`[DEBUG] Lade Versuche aus API: ${attemptsFromApi}/${puzzleData.maxAttempts}`);
-      setAttempts(attemptsFromApi);
-      setMaxAttempts(puzzleData.maxAttempts);
-      
-      // Ergebnis-States zurücksetzen
-      setShowResult(false);
-      setIsCorrect(false);
-      setShowTrophy(false);
+  // Versuche in der Datenbank zurücksetzen
+  const resetPuzzleAttempts = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log('[DEBUG] Versuche erfolgreich zurückgesetzt');
+          setAttempts(0);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Zurücksetzen der Versuche:', error);
     }
-  }, [puzzleData]);
+  }, [puzzleId]);
 
   // Lade Puzzle-Daten beim ersten Laden
   useEffect(() => {
     loadPuzzle();
-  }, [puzzleId]);
+  }, [loadPuzzle]);
 
   // Reset alle States beim Öffnen des Rätsels
   useEffect(() => {
@@ -192,40 +198,7 @@ export default function PuzzleCodeInput({
       // Rätsel NICHT schließen - nur Versuche zurücksetzen
       // Das Rätsel soll weiter spielbar bleiben
     }
-  }, [alarmLevel, lastAlarmLevel]);
-
-  // Versuche in der Datenbank zurücksetzen
-  const resetPuzzleAttempts = async () => {
-    try {
-      const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          reason: 'Alarm-Level erhöht - Versuche zurückgesetzt'
-        }),
-      });
-
-      if (response.ok) {
-        console.log('Versuche erfolgreich zurückgesetzt');
-        // Versuche sofort auf 0 setzen
-        setAttempts(0);
-        
-        // Kurze Nachricht anzeigen
-        setShowResult(true);
-        setIsCorrect(false);
-        setTimeout(() => {
-          setShowResult(false);
-        }, 3000);
-      } else {
-        console.log('Fehler beim Zurücksetzen der Versuche');
-      }
-    } catch (error) {
-      console.error('Fehler beim Zurücksetzen der Versuche:', error);
-    }
-  };
+  }, [alarmLevel, lastAlarmLevel, resetPuzzleAttempts]);
 
   const handleCodeChange = (value: string) => {
     setCodeInput(value);

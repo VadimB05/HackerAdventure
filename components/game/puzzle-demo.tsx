@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,7 +17,7 @@ export default function PuzzleDemo() {
   const [useMockData, setUseMockData] = useState(false);
 
   // Mock-Daten für Fallback
-  const mockPuzzles: MultiQuestionPuzzleData[] = [
+  const mockPuzzles = useMemo((): MultiQuestionPuzzleData[] => [
     {
       puzzleId: 'demo-1',
       roomId: 'bedroom',
@@ -136,13 +136,9 @@ export default function PuzzleDemo() {
         completedQuestions: []
       }
     }
-  ];
+  ], []);
 
-  useEffect(() => {
-    loadPuzzles();
-  }, []);
-
-  const loadPuzzles = async () => {
+  const loadPuzzles = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -192,7 +188,11 @@ export default function PuzzleDemo() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [mockPuzzles]);
+
+  useEffect(() => {
+    loadPuzzles();
+  }, [loadPuzzles]);
 
   const handleSolve = (puzzleId: string, isCorrect: boolean) => {
     console.log(`Rätsel ${puzzleId} gelöst: ${isCorrect ? 'Richtig' : 'Falsch'}`);

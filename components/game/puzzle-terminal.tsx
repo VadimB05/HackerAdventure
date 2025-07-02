@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,10 +126,10 @@ export default function PuzzleTerminal({
       // Rätsel NICHT schließen - nur Versuche zurücksetzen
       // Das Rätsel soll weiter spielbar bleiben
     }
-  }, [alarmLevel, lastAlarmLevel]);
+  }, [alarmLevel, lastAlarmLevel, resetPuzzleAttempts]);
 
   // Versuche in der Datenbank zurücksetzen
-  const resetPuzzleAttempts = async () => {
+  const resetPuzzleAttempts = useCallback(async () => {
     try {
       const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
         method: 'POST',
@@ -144,10 +144,10 @@ export default function PuzzleTerminal({
     } catch (error) {
       console.error('Fehler beim Zurücksetzen der Versuche:', error);
     }
-  };
+  }, [puzzleId]);
 
   // Puzzle laden
-  const loadPuzzle = async () => {
+  const loadPuzzle = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -213,7 +213,7 @@ export default function PuzzleTerminal({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleId, puzzleData, startTimer, addCommandToHistory]);
 
   useEffect(() => {
     if (puzzleData) {
@@ -228,7 +228,7 @@ export default function PuzzleTerminal({
   // Lade Puzzle-Daten beim ersten Laden
   useEffect(() => {
     loadPuzzle();
-  }, [puzzleId]);
+  }, [loadPuzzle]);
 
   // Reset alle States beim Öffnen des Rätsels
   useEffect(() => {
@@ -241,14 +241,14 @@ export default function PuzzleTerminal({
     }
   }, [puzzleId]);
 
-  const addCommandToHistory = (type: 'user' | 'system', command: string) => {
+  const addCommandToHistory = useCallback((type: 'user' | 'system', command: string) => {
     const newCommand: TerminalCommand = {
       type,
       command,
       timestamp: new Date()
     };
     setCommandHistory(prev => [...prev, newCommand]);
-  };
+  }, []);
 
   const handleSubmit = async (command: string) => {
     if (!command.trim()) return;
@@ -401,7 +401,7 @@ export default function PuzzleTerminal({
     }
   };
 
-  const startTimer = () => {
+  const startTimer = useCallback(() => {
     if (timeLimit && timeLimit > 0) {
       timerRef.current = setInterval(() => {
         setTimeRemaining(prev => {
@@ -415,7 +415,7 @@ export default function PuzzleTerminal({
         });
       }, 1000);
     }
-  };
+  }, [timeLimit]);
 
   if (isLoading) {
     return (

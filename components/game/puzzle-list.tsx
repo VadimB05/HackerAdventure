@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -50,11 +50,7 @@ export default function PuzzleList({
   const [error, setError] = useState<string | null>(null);
   const [useMockData, setUseMockData] = useState(false);
 
-  useEffect(() => {
-    loadPuzzles();
-  }, [puzzleType, roomId]);
-
-  const loadPuzzles = async () => {
+  const loadPuzzles = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -106,7 +102,11 @@ export default function PuzzleList({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleType, roomId, mockPuzzles]);
+
+  useEffect(() => {
+    loadPuzzles();
+  }, [loadPuzzles]);
 
   const getPuzzleIcon = (type: string) => {
     switch (type) {

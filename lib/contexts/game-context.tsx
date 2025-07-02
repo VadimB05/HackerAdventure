@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSavePoints } from '@/lib/services/save-service';
 
@@ -95,63 +95,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [hasGameProgress, setHasGameProgress] = useState(false);
   const [hasSkippedIntro, setHasSkippedIntro] = useState(false);
 
-  // Beim Laden prüfen, ob User angemeldet ist
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
-
-  // Prüfe Intro-Speicherpunkt, sobald User gesetzt ist
-  useEffect(() => {
-    if (user) {
-      checkIntroSkipped();
-    }
-  }, [user]);
-
-  const checkAuthStatus = async () => {
-    try {
-      const response = await fetch('/api/auth/verify', {
-        method: 'GET',
-        credentials: 'include'
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        
-        // Spielstand prüfen
-        await checkGameProgress();
-      } else {
-        // Explizit User auf null setzen wenn nicht angemeldet
-        setUser(null);
-        setGameState(null);
-        setHasGameProgress(false);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      // Bei Fehler auch User auf null setzen
-      setUser(null);
-      setGameState(null);
-      setHasGameProgress(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const checkIntroSkipped = async () => {
-    try {
-      if (!user) return;
-      const result = await getSavePoints(user.id);
-      if (result.success && result.savePoints) {
-        const found = result.savePoints.some(sp => sp.eventType === 'game_started');
-        console.log('Intro-Speicherpunkt gefunden:', found, result.savePoints);
-        setHasSkippedIntro(found);
-      }
-    } catch (e) {
-      setHasSkippedIntro(false);
-    }
-  };
-
-  const checkGameProgress = async (): Promise<boolean> => {
+  const checkGameProgress = useCallback(async (): Promise<boolean> => {
     console.log('checkGameProgress called, user:', user);
     
     if (!user) {
@@ -209,7 +153,63 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setHasGameProgress(false);
       return false;
     }
-  };
+  }, [user]);
+
+  const checkAuthStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/verify', {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+        
+        // Spielstand prüfen
+        await checkGameProgress();
+      } else {
+        // Explizit User auf null setzen wenn nicht angemeldet
+        setUser(null);
+        setGameState(null);
+        setHasGameProgress(false);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      // Bei Fehler auch User auf null setzen
+      setUser(null);
+      setGameState(null);
+      setHasGameProgress(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [checkGameProgress]);
+
+  const checkIntroSkipped = useCallback(async () => {
+    try {
+      if (!user) return;
+      const result = await getSavePoints(user.id);
+      if (result.success && result.savePoints) {
+        const found = result.savePoints.some(sp => sp.eventType === 'game_started');
+        console.log('Intro-Speicherpunkt gefunden:', found, result.savePoints);
+        setHasSkippedIntro(found);
+      }
+    } catch (e) {
+      setHasSkippedIntro(false);
+    }
+  }, [user]);
+
+  // Beim Laden prüfen, ob User angemeldet ist
+  useEffect(() => {
+    checkAuthStatus();
+  }, [checkAuthStatus]);
+
+  // Prüfe Intro-Speicherpunkt, sobald User gesetzt ist
+  useEffect(() => {
+    if (user) {
+      checkIntroSkipped();
+    }
+  }, [user, checkIntroSkipped]);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
