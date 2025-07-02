@@ -1,54 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/auth-utils';
+import { executeQuery } from '@/lib/database';
+import { getUserById } from '@/lib/services/auth-service';
 
 /**
  * Alle Benutzer für Admin abrufen
  * GET /api/admin/users
  */
-export async function GET(request: NextRequest) {
+async function handler(request: NextRequest) {
   try {
-    // Platzhalter-Daten für Test
-    const users = [
-      {
-        id: 1,
-        username: 'admin',
-        email: 'admin@intrusion.com',
-        isAdmin: true,
-        isActive: true,
-        createdAt: '2024-01-01T00:00:00Z',
-        lastLogin: '2024-01-15T10:30:00Z'
-      },
-      {
-        id: 2,
-        username: 'player1',
-        email: 'player1@example.com',
-        isAdmin: false,
-        isActive: true,
-        createdAt: '2024-01-02T00:00:00Z',
-        lastLogin: '2024-01-14T15:45:00Z'
-      },
-      {
-        id: 3,
-        username: 'player2',
-        email: 'player2@example.com',
-        isAdmin: false,
-        isActive: false,
-        createdAt: '2024-01-03T00:00:00Z',
-        lastLogin: '2024-01-10T09:20:00Z'
-      }
-    ];
+    // User-Info aus Headers extrahieren
+    const user = getAuthenticatedUser(request);
+    
+    if (!user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authentifizierung erforderlich'
+      }, { status: 401 });
+    }
+
+    // Admin-Status aus der Datenbank prüfen
+    const dbUser = await getUserById(user.id);
+    if (!dbUser || !dbUser.isAdmin) {
+      return NextResponse.json({
+        success: false,
+        error: 'Admin-Berechtigung erforderlich'
+      }, { status: 403 });
+    }
+
+    // Alle Benutzer aus der Datenbank laden
+    const users = await executeQuery(`
+      SELECT 
+        id,
+        username,
+        email,
+        is_admin,
+        is_active,
+        created_at,
+        last_login
+      FROM users 
+      ORDER BY created_at DESC
+    `);
 
     return NextResponse.json({
       success: true,
-      users,
-      count: users.length
-    }, { status: 200 });
+      users
+    });
   } catch (error) {
+    console.error('Error loading users:', error);
     return NextResponse.json({
       success: false,
-      error: 'Fehler beim Abrufen der Benutzer'
+      error: 'Fehler beim Laden der Benutzer'
     }, { status: 500 });
   }
 }
+
+export const GET = handler;
 
 /**
  * Benutzer-Status ändern
