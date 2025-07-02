@@ -45,7 +45,7 @@ jobs:
       env:
         NODE_ENV: production
         # Hier können weitere Umgebungsvariablen hinzugefügt werden
-        # DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
         JWT_SECRET: ${{ secrets.JWT_TOKEN }}
         # CUSTOM_KEY: ${{ secrets.CUSTOM_KEY }}
         
@@ -56,14 +56,42 @@ jobs:
         path: .next/
         retention-days: 1
         
-    # Optional: Deployment-Schritt (hier als Beispiel für SSH-Deployment)
-    - name: Deploy to server
+    - name: Deploy to server via SSH
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        port: ${{ secrets.SERVER_PORT || 22 }}
+        script: |
+          # PM2 installieren (falls nicht vorhanden)
+          npm install -g pm2 || true
+
+          # Navigiere zum Projektverzeichnis
+          cd ${{ secrets.PROJECT_PATH }}
+          
+          # Stoppe den aktuellen Prozess (falls vorhanden)
+          pm2 stop intrusion-hacker-adventure || true
+          pm2 delete intrusion-hacker-adventure || true
+          
+          # Git pull für die neuesten Änderungen
+          git pull origin main
+          
+          # Installiere Dependencies
+          pnpm install --frozen-lockfile --prod
+          
+          # Starte die Anwendung mit PM2
+          pm2 start npm --name "intrusion-hacker-adventure" -- start
+          
+          # Speichere PM2-Konfiguration
+          pm2 save
+          
+          # Zeige Status
+          pm2 status
+          
+    - name: Health check
       run: |
-        echo "Deployment würde hier stattfinden"
-        echo "Du kannst hier deine Deployment-Logik hinzufügen:"
-        echo "- SSH-Verbindung zum Server"
-        echo "- Dateien kopieren"
-        echo "- Service neu starten"
-        # Beispiel für SSH-Deployment:
-        # ssh user@your-server.com "cd /path/to/app && git pull && pnpm install && pnpm run build && pm2 restart app" 
+        # Warte kurz und führe dann einen Health Check durch
+        sleep 30
+        curl -f ${{ secrets.HEALTH_CHECK_URL }} || exit 1 
