@@ -1,38 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: process.env.NODE_ENV === 'production',
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: process.env.NODE_ENV === 'production',
   },
   images: {
     unoptimized: true,
   },
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    serverComponentsExternalPackages: ['mysql2']
   },
-  serverExternalPackages: ['mysql2'],
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
-    PORT: process.env.PORT || '3001',
   },
-  // Deaktiviere statische Generierung komplett
-  trailingSlash: false,
-  // Ignoriere Build-Fehler bei statischen Seiten
-  generateBuildId: async () => {
-    return 'build-' + Date.now()
-  },
-  // Deaktiviere statische Generierung für problematische Seiten
-  skipTrailingSlashRedirect: true,
-  skipMiddlewareUrlNormalize: true,
-  // Ignoriere Build-Fehler bei statischen Seiten
-  onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
-  },
-  // Deaktiviere statische Generierung
-  distDir: '.next',
   webpack: (config, { isServer }) => {
     // mysql2 nur im Server verwenden
     if (!isServer) {

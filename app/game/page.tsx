@@ -4,9 +4,9 @@ import GameLayout from "@/components/game/game-layout"
 import { GameProvider } from "@/components/game/game-context"
 import IntroStory from "@/components/game/intro-story"
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect } from 'react'
 
-function GameContent() {
+export default function GamePage() {
   const searchParams = useSearchParams();
   const continueGame = searchParams.get('continue') === 'true';
   const roomId = searchParams.get('room') || 'intro';
@@ -30,13 +30,5 @@ function GameContent() {
       <GameLayout onIntroModalComplete={() => setShowIntroStory(true)} />
       {showIntroStory && <IntroStory />}
     </GameProvider>
-  )
-}
-
-export default function GamePage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <GameContent />
-    </Suspense>
   )
 } 

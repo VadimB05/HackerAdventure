@@ -22,15 +22,19 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <GameProvider>
-        {children}
-      </GameProvider>
-    </ThemeProvider>
+    <html lang="de" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <GameProvider>
+            {children}
+          </GameProvider>
+        </ThemeProvider>
+      </body>
+    </html>
   )
 }
