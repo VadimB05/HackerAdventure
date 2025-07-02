@@ -6,15 +6,20 @@ Dieses Repository enthält GitHub Actions Workflows für automatisches CI/CD. We
 
 ## Workflows
 
-### 1. `deploy.yml` - Basis Workflow
+### 1. `deploy.yml` - Basis Workflow (pnpm)
 - Führt Build und Tests aus
 - Lädt Build-Artefakte hoch
 - Enthält Platzhalter für Deployment-Logik
 
-### 2. `deploy-ssh.yml` - Vollständiger SSH-Deployment Workflow
+### 2. `deploy-ssh.yml` - Vollständiger SSH-Deployment Workflow (pnpm)
 - Vollständiger CI/CD-Pipeline mit SSH-Deployment
 - Verwendet PM2 für Prozess-Management
 - Enthält Health Checks
+
+### 3. `deploy-npm.yml` - Alternative mit npm
+- Falls pnpm Probleme verursacht
+- Verwendet npm anstelle von pnpm
+- Gleiche Funktionalität wie deploy-ssh.yml
 
 ## Einrichtung
 
@@ -41,14 +46,17 @@ CUSTOM_KEY          # Weitere Umgebungsvariablen
 
 ### 2. Server vorbereiten
 
-#### Node.js und pnpm installieren:
+#### Node.js und Package Manager installieren:
 ```bash
 # Node.js 18 installieren
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# pnpm installieren
+# pnpm installieren (empfohlen)
 npm install -g pnpm
+
+# ODER npm verwenden (falls pnpm Probleme verursacht)
+# npm ist bereits mit Node.js installiert
 
 # PM2 installieren
 npm install -g pm2

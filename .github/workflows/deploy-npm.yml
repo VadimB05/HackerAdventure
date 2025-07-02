@@ -1,4 +1,4 @@
-name: Deploy to Production (SSH)
+name: Deploy to Production (npm)
 
 on:
   push:
@@ -16,30 +16,19 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 8
-        
-    - name: Get pnpm store directory
-      shell: bash
-      run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        cache: 'npm'
         
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-      env:
-        PNPM_HOME: ${{ github.workspace }}/.pnpm
+      run: npm ci
       
     - name: Run type check
-      run: pnpm run type-check
+      run: npm run type-check
       
     - name: Run linting
-      run: pnpm run lint
+      run: npm run lint
       
     - name: Build application
-      run: pnpm run build
+      run: npm run build
       env:
         NODE_ENV: production
         # Füge hier deine Umgebungsvariablen hinzu
@@ -73,21 +62,10 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 8
-        
-    - name: Get pnpm store directory
-      shell: bash
-      run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        cache: 'npm'
         
     - name: Install production dependencies
-      run: pnpm install --frozen-lockfile --prod
-      env:
-        PNPM_HOME: ${{ github.workspace }}/.pnpm
+      run: npm ci --only=production
       
     - name: Deploy to server via SSH
       uses: appleboy/ssh-action@v1.0.3
@@ -108,7 +86,7 @@ jobs:
           git pull origin main
           
           # Installiere Dependencies
-          pnpm install --frozen-lockfile --prod
+          npm ci --only=production
           
           # Starte die Anwendung mit PM2
           pm2 start npm --name "intrusion-hacker-adventure" -- start

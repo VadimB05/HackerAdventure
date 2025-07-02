@@ -13,6 +13,11 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 8
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -20,13 +25,15 @@ jobs:
         node-version: '18'
         cache: 'pnpm'
         
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 8
+    - name: Get pnpm store directory
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
         
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
+      env:
+        PNPM_HOME: ${{ github.workspace }}/.pnpm
       
     - name: Run type check
       run: pnpm run type-check
