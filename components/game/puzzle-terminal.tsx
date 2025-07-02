@@ -114,20 +114,6 @@ export default function PuzzleTerminal({
     }
   }, [currentCommand, isSubmitting]);
 
-  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
-  useEffect(() => {
-    if (alarmLevel > lastAlarmLevel) {
-      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
-      setLastAlarmLevel(alarmLevel);
-      
-      // Versuche zurücksetzen
-      resetPuzzleAttempts();
-      
-      // Rätsel NICHT schließen - nur Versuche zurücksetzen
-      // Das Rätsel soll weiter spielbar bleiben
-    }
-  }, [alarmLevel, lastAlarmLevel, resetPuzzleAttempts]);
-
   // Versuche in der Datenbank zurücksetzen
   const resetPuzzleAttempts = useCallback(async () => {
     try {
@@ -145,6 +131,47 @@ export default function PuzzleTerminal({
       console.error('Fehler beim Zurücksetzen der Versuche:', error);
     }
   }, [puzzleId]);
+
+  const addCommandToHistory = useCallback((type: 'user' | 'system', command: string) => {
+    const newCommand: TerminalCommand = {
+      type,
+      command,
+      timestamp: new Date()
+    };
+    setCommandHistory(prev => [...prev, newCommand]);
+  }, []);
+
+  const startTimer = useCallback(() => {
+    if (timeLimit && timeLimit > 0) {
+      const timer = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev && prev > 0) {
+            return prev - 1;
+          } else {
+            clearInterval(timer);
+            return 0;
+          }
+        });
+      }, 1000);
+      
+      // Timer-Referenz speichern für Cleanup
+      timerRef.current = timer;
+    }
+  }, [timeLimit]);
+
+  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
+  useEffect(() => {
+    if (alarmLevel > lastAlarmLevel) {
+      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
+      setLastAlarmLevel(alarmLevel);
+      
+      // Versuche zurücksetzen
+      resetPuzzleAttempts();
+      
+      // Rätsel NICHT schließen - nur Versuche zurücksetzen
+      // Das Rätsel soll weiter spielbar bleiben
+    }
+  }, [alarmLevel, lastAlarmLevel, resetPuzzleAttempts]);
 
   // Puzzle laden
   const loadPuzzle = useCallback(async () => {
@@ -240,15 +267,6 @@ export default function PuzzleTerminal({
       setCurrentHintIndex(0);
     }
   }, [puzzleId]);
-
-  const addCommandToHistory = useCallback((type: 'user' | 'system', command: string) => {
-    const newCommand: TerminalCommand = {
-      type,
-      command,
-      timestamp: new Date()
-    };
-    setCommandHistory(prev => [...prev, newCommand]);
-  }, []);
 
   const handleSubmit = async (command: string) => {
     if (!command.trim()) return;
@@ -400,22 +418,6 @@ export default function PuzzleTerminal({
       default: return 'Unbekannt';
     }
   };
-
-  const startTimer = useCallback(() => {
-    if (timeLimit && timeLimit > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev === null || prev <= 1) {
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-  }, [timeLimit]);
 
   if (isLoading) {
     return (

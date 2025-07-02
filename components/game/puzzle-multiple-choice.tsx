@@ -150,7 +150,7 @@ export default function PuzzleMultipleChoice({
         
         if (data.isCorrect) {
           // Alarm-Level erhöhen bei korrekter Antwort
-          increaseAlarmLevel();
+          increaseAlarmLevel('Korrekte Antwort im Multiple-Choice-Rätsel');
           
           // Kurze Verzögerung vor dem Schließen
           setTimeout(() => {
@@ -158,7 +158,7 @@ export default function PuzzleMultipleChoice({
           }, 2000);
         } else {
           // Bei falscher Antwort Alarm-Level erhöhen
-          increaseAlarmLevel();
+          increaseAlarmLevel('Falsche Antwort im Multiple-Choice-Rätsel');
           
           // Kurze Verzögerung vor dem Zurücksetzen
           setTimeout(() => {
