@@ -1,19 +1,31 @@
-# INTRUSION - Hacker Adventure
+# INTRUSION – Hacker Adventure
 
-Ein Next.js-basiertes Hacker-Adventure-Spiel mit React Frontend und Node.js API Backend.
+Ein Next.js-basiertes Hacker-Adventure-Spiel mit React-Frontend, Node.js-API und MariaDB-Backend.
 
-## 🎮 Projektübersicht
+---
 
-INTRUSION ist ein interaktives Hacker-Adventure-Spiel, das verschiedene Rätseltypen (Point-and-Click, Terminal) und ein Inventarsystem bietet. Das Spiel verwendet eine modulare Struktur für Missionen/Räume und datengetriebenes Level-Design.
+## 🚀 Features
+
+- **Modulares Rätsel- und Fortschrittssystem**  
+  → Siehe [PUZZLE_SYSTEM.md](./PUZZLE_SYSTEM.md), [PROGRESS_SYSTEM.md](./PROGRESS_SYSTEM.md)
+- **Alarm-Level-System**: Steigt nur bei max. Fehlversuchen, serverseitig, zentrales Notify  
+  → Siehe [ALARM_LEVEL_SETUP.md](./ALARM_LEVEL_SETUP.md)
+- **Manipulationssichere Logik**: Fortschritt, Versuche und Alarm-Level werden ausschließlich serverseitig verwaltet
+- **Admin-UI**: Drag-and-Drop, Fehlerbanner, optimierter Bild-Upload
+- **JWT-Authentifizierung**  
+  → Siehe [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md)
+- **CI/CD-Deployment**: GitHub Actions, SSH, PM2  
+  → Siehe [CI_CD_SETUP.md](./CI_CD_SETUP.md)
+
+---
 
 ## 🛠 Technologie-Stack
 
-- **Frontend**: Next.js 15 mit App Router, React 19, TypeScript
-- **Backend**: Node.js API-Routen in Next.js
-- **Datenbank**: MariaDB (MySQL-kompatibel) mit mysql2
-- **Authentifizierung**: JWT-basiert
-- **UI**: Radix UI Komponenten mit Tailwind CSS
-- **Styling**: Tailwind CSS mit Dark Mode Support
+- **Frontend**: Next.js 15, React 19, TypeScript, Radix UI, Tailwind CSS
+- **Backend**: Node.js API-Routen, MariaDB/MySQL, mysql2
+- **CI/CD**: GitHub Actions, SSH, PM2
+
+---
 
 ## 📁 Projektstruktur
 
@@ -21,190 +33,78 @@ INTRUSION ist ein interaktives Hacker-Adventure-Spiel, das verschiedene Rätselt
 HackerAdventure/
 ├── app/                    # Next.js App Router
 │   ├── api/               # API-Routen (Backend)
-│   │   ├── auth/          # Authentifizierung
-│   │   └── game/          # Spiel-Logik
-│   ├── game/              # Spiel-Seiten
-│   ├── globals.css        # Globale Styles
-│   ├── layout.tsx         # Root Layout
-│   └── page.tsx           # Startseite
+│   └── game/              # Spiel-Seiten
 ├── components/            # React Komponenten
 │   ├── game/              # Spiel-spezifische Komponenten
 │   ├── ui/                # UI-Komponenten (Radix UI)
-│   └── theme-provider.tsx # Theme Provider
 ├── lib/                   # Utility-Funktionen
-│   ├── auth.ts           # JWT-Authentifizierung
-│   ├── database.ts       # Datenbankverbindung
-│   └── utils.ts          # Allgemeine Utilities
 ├── hooks/                 # Custom React Hooks
 ├── public/                # Statische Assets
 └── styles/                # Zusätzliche Styles
 ```
 
-## 🚀 Einrichtung
+---
 
-### Voraussetzungen
+## 🏗 Einrichtung
 
-- Node.js 18+ 
-- pnpm (empfohlen) oder npm
-- MariaDB/MySQL Datenbank
+1. **Repository klonen & Abhängigkeiten installieren**
+   ```bash
+   git clone <repository-url>
+   cd HackerAdventure
+   pnpm install
+   ```
+2. **Umgebungsvariablen**: Nur über `.env` (siehe [ENVIRONMENT.md](./ENVIRONMENT.md)), Secrets für Deployment ausschließlich in GitHub Actions
+3. **Datenbank einrichten**: Siehe [ALARM_LEVEL_SETUP.md](./ALARM_LEVEL_SETUP.md), [PROGRESS_SYSTEM.md](./PROGRESS_SYSTEM.md), [ROOM_SYSTEM.md](./ROOM_SYSTEM.md)
+4. **Entwicklungsserver starten**
+   ```bash
+   pnpm dev
+   ```
 
-### 1. Repository klonen
+---
 
-```bash
-git clone <repository-url>
-cd HackerAdventure
-```
+## 🚀 Deployment
 
-### 2. Dependencies installieren
+- **Automatisches Deployment**: Jeder Push auf `main` triggert GitHub Actions Workflow (siehe [CI_CD_SETUP.md](./CI_CD_SETUP.md))
+- **Server-Voraussetzungen**: Node.js 18+, pnpm, PM2, MariaDB
+- **Secrets**: Nur in GitHub Actions
 
-```bash
-pnpm install
-```
-
-### 3. Umgebungsvariablen konfigurieren
-
-**Option A: Automatisches Setup (empfohlen)**
-```bash
-pnpm run setup-env
-```
-
-**Option B: Manuelles Setup**
-```bash
-# Kopiere die Beispiel-Konfiguration
-cp env.example .env
-
-# Bearbeite die .env Datei mit deinen Werten
-```
-
-**Erforderliche Umgebungsvariablen:**
-```env
-# ========================================
-# DATENBANK-KONFIGURATION
-# ========================================
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_password_here
-DB_NAME=intrusion_game
-
-# ========================================
-# JWT-AUTHENTIFIZIERUNG
-# ========================================
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-
-# ========================================
-# NEXT.JS-KONFIGURATION
-# ========================================
-NODE_ENV=development
-DEBUG=false
-```
-
-**Wichtige Hinweise:**
-- Die `.env` Datei ist bereits in `.gitignore` enthalten
-- Ändere das `JWT_SECRET` in Produktion (mindestens 32 Zeichen)
-- Verwende starke Passwörter für die Datenbank
-- Siehe `ENVIRONMENT.md` für detaillierte Dokumentation
-
-### 4. Datenbank einrichten
-
-```sql
--- Datenbank erstellen
-CREATE DATABASE intrusion_game CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Benutzer-Tabelle erstellen
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- Spielstand-Tabelle erstellen
-CREATE TABLE game_states (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    current_room VARCHAR(100) NOT NULL,
-    inventory JSON,
-    progress JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-```
-
-### 5. Entwicklungsserver starten
-
-```bash
-pnpm dev
-```
-
-Das Spiel ist dann unter `http://localhost:3000` verfügbar.
-
-## 🔧 Verfügbare Scripts
-
-- `pnpm dev` - Entwicklungsserver starten
-- `pnpm build` - Produktions-Build erstellen
-- `pnpm start` - Produktions-Server starten
-- `pnpm lint` - ESLint ausführen
-- `pnpm type-check` - TypeScript-Typen prüfen
-- `pnpm setup-env` - Umgebungskonfiguration einrichten
-
-## 🏗 Architektur
-
-### Frontend (Client-Side)
-- **React Components**: Modulare UI-Komponenten
-- **Game Context**: Zustandsverwaltung für das Spiel
-- **Responsive Design**: Mobile-first Ansatz
-- **Dark Mode**: Unterstützung für dunkles Theme
-
-### Backend (Server-Side)
-- **API Routes**: RESTful Endpoints in `/app/api/`
-- **Authentication**: JWT-basierte Authentifizierung
-- **Database**: Sichere SQL-Abfragen mit mysql2
-- **Validation**: Input-Validierung mit Zod
-
-### Datenbank
-- **MariaDB**: MySQL-kompatible Datenbank
-- **Connection Pooling**: Optimierte Datenbankverbindungen
-- **JSON Storage**: Flexible Speicherung für Spielstände
+---
 
 ## 🔒 Sicherheit
 
-- **Password Hashing**: bcryptjs für sichere Passwort-Speicherung
-- **JWT Tokens**: Sichere Session-Verwaltung
-- **SQL Injection Protection**: Prepared Statements
-- **Input Validation**: Umfassende Eingabevalidierung
-- **CORS**: Konfigurierte Cross-Origin Resource Sharing
-- **Environment Variables**: Sichere Konfigurationsverwaltung
+- **JWT-Authentifizierung** (siehe [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md))
+- **Serverseitige Validierung** aller Spielfortschritte und Alarm-Level
+- **SQL-Injection-Schutz, Input-Validierung**
 
-## 🧪 Testing
+---
 
-Das Projekt ist für Unit- und Integrationstests vorbereitet:
+## 📄 API
 
-- **Pure Functions**: Puzzle-Logik als testbare Funktionen
-- **API Testing**: Endpoint-Tests möglich
-- **Component Testing**: React-Komponenten-Tests
+- **Universeller Solve-Endpoint**: `/api/game/solve` (siehe [API_SOLVE_ENDPOINT.md](./API_SOLVE_ENDPOINT.md))
+- **Alle Endpunkte und Response-Formate**: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
 
-## 📈 Performance
+---
 
-- **Code Splitting**: Automatisches Code-Splitting durch Next.js
-- **Image Optimization**: Next.js Image-Komponente
-- **Database Optimization**: Connection Pooling
-- **Caching**: Strategien für bessere Performance
+## 📚 Weitere Dokumentation
 
-## 🤝 Beitragen
+- [ALARM_LEVEL_SETUP.md](./ALARM_LEVEL_SETUP.md)
+- [PUZZLE_SYSTEM.md](./PUZZLE_SYSTEM.md)
+- [PROGRESS_SYSTEM.md](./PROGRESS_SYSTEM.md)
+- [ROOM_SYSTEM.md](./ROOM_SYSTEM.md)
+- [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md)
+- [API_SOLVE_ENDPOINT.md](./API_SOLVE_ENDPOINT.md)
+- [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
+- [CI_CD_SETUP.md](./CI_CD_SETUP.md)
 
-1. Fork das Repository
-2. Erstellen Sie einen Feature-Branch
-3. Committen Sie Ihre Änderungen
-4. Pushen Sie zum Branch
-5. Erstellen Sie einen Pull Request
-
-## 📄 Lizenz
-
-Dieses Projekt ist unter der MIT-Lizenz lizenziert.
+---
 
 ## 🆘 Support
 
-Bei Fragen oder Problemen erstellen Sie bitte ein Issue im Repository.
+Bei Fragen oder Problemen siehe Issues oder die jeweiligen .md-Dokumente.
+
+---
+
+## 📄 Lizenz
+
+Dieses Projekt unterliegt dem Urheberrecht des Autors. Die Nutzung ist ausschließlich für private, nicht-kommerzielle Zwecke gestattet. Jegliche kommerzielle Nutzung, Weitergabe oder Veröffentlichung – ganz oder in Teilen – ist ohne ausdrückliche schriftliche Genehmigung des Urhebers untersagt.
+

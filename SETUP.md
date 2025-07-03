@@ -278,29 +278,7 @@ pnpm test:e2e
 
 ## 📦 Deployment
 
-### Vercel (Empfohlen)
-
-1. Repository zu Vercel verbinden
-2. Umgebungsvariablen in Vercel Dashboard setzen
-3. Datenbank-Verbindung konfigurieren
-4. Deploy
-
-### Docker
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-RUN npm run build
-
-EXPOSE 3000
-CMD ["npm", "start"]
-```
+- Das Deployment und die Konfiguration für den Produktivbetrieb werden in der Datei **CI_CD_SETUP.md** beschrieben.
 
 ## 📞 Support
 
