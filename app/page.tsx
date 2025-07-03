@@ -203,6 +203,18 @@ export default function HomePage() {
                 Optionen
               </Button>
 
+              {/* Admin-Panel - nur für Admins sichtbar */}
+              {user && user.isAdmin && (
+                <Button
+                  onClick={() => window.location.href = '/admin'}
+                  variant="outline"
+                  className="w-full h-16 text-xl border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
+                >
+                  <Crown className="mr-3 h-6 w-6" />
+                  Admin-Panel
+                </Button>
+              )}
+
               {/* Abmelden - nur für angemeldete Benutzer */}
               {user && (
                 <Button
