@@ -72,12 +72,6 @@ const navigationItems = [
     href: '/admin/objects', 
     description: 'Items und Raum-Objekte verwalten' 
   },
-  { 
-    name: 'Einstellungen', 
-    icon: Settings, 
-    href: '/admin/settings', 
-    description: 'System-Einstellungen' 
-  }
 ];
 
 export default function AdminLayout({ children, title, description }: AdminLayoutProps) {
@@ -156,10 +150,10 @@ export default function AdminLayout({ children, title, description }: AdminLayou
             <Button
               variant="outline"
               className="w-full text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
-              onClick={() => router.push('/game')}
+              onClick={() => router.push('/')}
             >
               <Gamepad2 className="h-4 w-4 mr-2" />
-              Zum Spiel
+              Zum Hauptmenü
             </Button>
           </div>
         </div>
