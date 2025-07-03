@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Zap, Eye, Puzzle, Lock, Trophy, Package, MapPin, Coins, DoorOpen, Monitor, MessageSquare, MapPin as MapPinIcon, Server, ArrowRight, CheckCircle } from 'lucide-react';
 import SmartphoneOverlay from './smartphone-overlay';
-import ChoicePopup from './choice-popup';
 import MessagePopup from './message-popup';
 import InventoryBar from './inventory-bar';
 import DragDropFeedback from './drag-drop-feedback';
 import { pickItem, getRoomItems, useItem, type InventoryItem } from '@/lib/services/inventory-service';
 import { changeRoom, getGameProgress } from '@/lib/services/progress-service';
 import GuidedMissionModal from './GuidedMissionModal';
+import Image from 'next/image';
+import { useGameState } from '@/lib/contexts/game-context'
+import { AlarmNotifyPopup } from './money-popup';
 
 interface InteractiveObject {
   id: string;
@@ -133,16 +135,8 @@ export default function RoomView({
     };
   }, []);
 
-  // Raum laden
-  useEffect(() => {
-    loadRoomData();
-    loadRoomItems();
-    loadGameProgress();
-    loadAvailableExits();
-    loadCityMissionStatus();
-  }, [roomId]);
-
-  const loadRoomData = async () => {
+  const loadRoomData = useCallback(async () => {
+    console.log('[DEBUG] useEffect: room-view.tsx MOUNTED, roomId:', roomId);
     setIsLoadingRoom(true);
     setRoomError(null);
     
@@ -150,6 +144,8 @@ export default function RoomView({
       const response = await fetch(`/api/game/rooms/${roomId}`, {
         credentials: 'include'
       });
+      
+      console.log('[DEBUG] fetch: /api/game/rooms/', roomId, 'Response:', response);
       
       const data = await response.json();
       
@@ -167,9 +163,9 @@ export default function RoomView({
     } finally {
       setIsLoadingRoom(false);
     }
-  };
+  }, [roomId]);
 
-  const loadRoomItems = async () => {
+  const loadRoomItems = useCallback(async () => {
     try {
       const result = await getRoomItems(roomId);
       if (result.success && result.items) {
@@ -178,9 +174,9 @@ export default function RoomView({
     } catch (error) {
       console.error('Fehler beim Laden der Raum-Items:', error);
     }
-  };
+  }, [roomId]);
 
-  const loadGameProgress = async () => {
+  const loadGameProgress = useCallback(async () => {
     try {
       // TODO: Echte User-ID verwenden
       const userId = 1;
@@ -194,41 +190,46 @@ export default function RoomView({
     } catch (error) {
       console.error('Fehler beim Laden des Spieler-Fortschritts:', error);
     }
-  };
+  }, []);
 
   // Prüfen ob Missionen abgeschlossen sind
   const checkMissionCompletion = async () => {
     try {
       console.log('[DEBUG] checkMissionCompletion: Starte Mission-Progress-Check');
       const response = await fetch('/api/game/progress');
-      const data = await response.json();
+      console.log('[DEBUG] fetch: /api/game/progress Response:', response);
       
-      if (data.success) {
-        const missionProgress = data.progress.missionProgress;
-        console.log('[DEBUG] checkMissionCompletion: Mission-Progress geladen:', missionProgress);
-        
-        // Sammle alle abgeschlossenen Missionen
-        const completed = new Set<string>();
-        missionProgress.forEach((m: any) => {
-          if (m.isCompleted) {
-            completed.add(m.missionId);
-            console.log('[DEBUG] checkMissionCompletion: Mission abgeschlossen:', m.missionId);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const missionProgress = data.progress.missionProgress;
+          console.log('[DEBUG] checkMissionCompletion: Mission-Progress geladen:', missionProgress);
+          
+          // Sammle alle abgeschlossenen Missionen
+          const completed = new Set<string>();
+          missionProgress.forEach((m: any) => {
+            if (m.isCompleted) {
+              completed.add(m.missionId);
+              console.log('[DEBUG] checkMissionCompletion: Mission abgeschlossen:', m.missionId);
+            }
+          });
+          
+          setCompletedMissions(completed);
+          
+          // Spezielle Behandlung für Mission 1 (für Kompatibilität)
+          const mission1Progress = missionProgress.find((m: any) => m.missionId === 'mission1_crypto_bank');
+          if (mission1Progress) {
+            setMissionCompleted(mission1Progress.isCompleted);
+          } else {
+            setMissionCompleted(false);
           }
-        });
-        
-        setCompletedMissions(completed);
-        
-        // Spezielle Behandlung für Mission 1 (für Kompatibilität)
-        const mission1Progress = missionProgress.find((m: any) => m.missionId === 'mission1_crypto_bank');
-        if (mission1Progress) {
-          setMissionCompleted(mission1Progress.isCompleted);
+          
+          console.log('[DEBUG] checkMissionCompletion: Completed missions:', Array.from(completed));
         } else {
-          setMissionCompleted(false);
+          console.error('[DEBUG] checkMissionCompletion: API-Fehler:', data.error);
         }
-        
-        console.log('[DEBUG] checkMissionCompletion: Completed missions:', Array.from(completed));
       } else {
-        console.error('[DEBUG] checkMissionCompletion: API-Fehler:', data.error);
+        console.error('[DEBUG] checkMissionCompletion: API-Fehler:', response.statusText);
       }
     } catch (error) {
       console.error('[DEBUG] checkMissionCompletion: Netzwerkfehler:', error);
@@ -251,6 +252,8 @@ export default function RoomView({
           stepId: 'check'
         }),
       });
+      
+      console.log('[DEBUG] fetch: /api/game/progress/mission Response:', response);
       
       const data = await response.json();
       console.log('[DEBUG] checkSpecificMissionStatus: Response:', data);
@@ -296,74 +299,34 @@ export default function RoomView({
     }
   };
 
-  const loadCityMissionStatus = async () => {
-    // Für Intro-Raum: Prüfe mission1_crypto_bank Status
-    if (roomId === 'intro') {
-      try {
-        const response = await fetch(`/api/game/progress/mission`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            missionId: 'mission1_crypto_bank',
-            stepId: 'check'
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          setCityMissionStatus({
-            allMissionsCompleted: data.isCompleted,
-            totalMissions: 1,
-            completedMissions: data.isCompleted ? 1 : 0,
-            missions: [{
-              missionId: 'mission1_crypto_bank',
-              buildingNumber: 1,
-              buildingName: 'Crypto Bank Mission',
-              isRequired: true,
-              isCompleted: data.isCompleted,
-              completedAt: data.isCompleted ? new Date().toISOString() : null
-            }]
-          });
-          console.log('Intro Mission Status geladen:', data);
-        } else {
-          console.error('Fehler beim Laden des Intro Mission Status:', data.error);
-        }
-      } catch (error) {
-        console.error('Netzwerkfehler beim Laden des Intro Mission Status:', error);
-      }
-      return;
-    }
-
-    // Nur laden wenn wir in einer Stadt sind (city1, city2, etc.)
-    if (!roomId.startsWith('city')) {
-      setCityMissionStatus(null);
-      return;
-    }
-
+  const loadCityMissionStatus = useCallback(async () => {
     try {
       const response = await fetch(`/api/game/city/${roomId}/missions-status`, {
         credentials: 'include'
       });
       
-      const data = await response.json();
+      console.log('[DEBUG] fetch: /api/game/city/', roomId, '/missions-status Response:', response);
       
-      if (data.success) {
-        setCityMissionStatus({
-          allMissionsCompleted: data.allMissionsCompleted,
-          totalMissions: data.totalMissions,
-          completedMissions: data.completedMissions,
-          missions: data.missions
-        });
-        console.log('City Mission Status geladen:', data);
-      } else {
-        console.error('Fehler beim Laden des City Mission Status:', data.error);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCityMissionStatus(data.status);
+        }
       }
     } catch (error) {
-      console.error('Netzwerkfehler beim Laden des City Mission Status:', error);
+      console.error('Fehler beim Laden des City Mission Status:', error);
     }
-  };
+  }, [roomId]);
+
+  // Raum laden
+  useEffect(() => {
+    console.log('[DEBUG] useEffect: room-view.tsx MOUNTED, roomId:', roomId);
+    loadRoomData();
+    loadRoomItems();
+    loadGameProgress();
+    loadAvailableExits();
+    loadCityMissionStatus();
+  }, [roomId, loadRoomData, loadRoomItems, loadGameProgress, loadCityMissionStatus]);
 
   const clearFeedback = () => {
     setShowFeedback(false);
@@ -403,6 +366,8 @@ export default function RoomView({
         itemId: item.id,
         roomId: roomId
       });
+
+      console.log('[DEBUG] fetch: /api/game/use-item Response:', result);
 
       if (result.success) {
         // Erfolgreich aufgesammelt
@@ -585,11 +550,20 @@ export default function RoomView({
         setIsUsingItem(true);
         
         // API-Aufruf für Item-Verwendung
-        const result = await useItem({
-          itemId: droppedItem.id,
-          targetObjectId: object.id,
-          roomId: roomId
-        });
+        const result = await fetch('/api/game/use-item', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            itemId: droppedItem.id,
+            targetObjectId: object.id,
+            roomId: roomId
+          }),
+        }).then(res => res.json());
+
+        console.log('[DEBUG] fetch: /api/game/use-item Response:', result);
 
         if (result.success) {
           // Erfolgreiche Interaktion
@@ -939,10 +913,11 @@ export default function RoomView({
           className="absolute inset-0"
         >
           {roomData.background ? (
-            <img
+            <Image
               src={roomData.background}
               alt={roomData.name}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
@@ -1230,32 +1205,6 @@ export default function RoomView({
         )}
       </AnimatePresence>
 
-      {/* Tür-Auswahl-Popup */}
-      <ChoicePopup
-        isOpen={isDoorPopupOpen}
-        title="Wohin möchtest du gehen?"
-        description="Wähle dein Ziel"
-        options={[
-          {
-            id: 'basement',
-            label: 'Basement',
-            description: 'Untergrund-Hacking-Zentrale',
-            icon: <Server className="h-5 w-5" />
-          },
-          {
-            id: 'city',
-            label: 'City',
-            description: 'Außenwelt erkunden',
-            icon: <MapPinIcon className="h-5 w-5" />
-          }
-        ]}
-        onSelect={(optionId) => {
-          setIsDoorPopupOpen(false);
-          console.log('Tür-Option ausgewählt:', optionId);
-        }}
-        onCancel={() => setIsDoorPopupOpen(false)}
-      />
-
       {/* Fenster-Nachricht-Popup */}
       <MessagePopup
         isOpen={isWindowPopupOpen}
@@ -1327,6 +1276,8 @@ export default function RoomView({
           await checkMissionCompletion();
         }}
       />
+
+      <AlarmNotifyPopup />
     </div>
   );
 } 

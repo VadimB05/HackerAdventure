@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,9 @@ import {
   Trophy,
   ChevronRight
 } from 'lucide-react';
-import { useGameState } from './game-context';
+import { useGameState } from '@/lib/contexts/game-context';
 import { PuzzleData } from '@/lib/services/puzzle-service';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface TerminalCommand {
   type: 'user' | 'system';
@@ -28,7 +29,7 @@ interface TerminalCommand {
 interface PuzzleTerminalProps {
   puzzleId: string;
   puzzleData?: PuzzleData;
-  onSolve: (puzzleId: string, isCorrect: boolean) => void;
+  onSolve: (puzzleId: string, isCorrect: boolean, alarmLevelIncreased?: boolean) => void;
   onClose: () => void;
 }
 
@@ -39,7 +40,7 @@ export default function PuzzleTerminal({
   onClose
 }: PuzzleTerminalProps) {
   // Game-Context für Alarm-Level
-  const { increaseAlarmLevel, alarmLevel } = useGameState();
+  const { increaseAlarmLevel, alarmLevel, addAlarmNotifyNotification } = useGameState();
   
   // Puzzle-Daten
   const [isLoading, setIsLoading] = useState(true);
@@ -114,22 +115,8 @@ export default function PuzzleTerminal({
     }
   }, [currentCommand, isSubmitting]);
 
-  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
-  useEffect(() => {
-    if (alarmLevel > lastAlarmLevel) {
-      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
-      setLastAlarmLevel(alarmLevel);
-      
-      // Versuche zurücksetzen
-      resetPuzzleAttempts();
-      
-      // Rätsel NICHT schließen - nur Versuche zurücksetzen
-      // Das Rätsel soll weiter spielbar bleiben
-    }
-  }, [alarmLevel, lastAlarmLevel]);
-
   // Versuche in der Datenbank zurücksetzen
-  const resetPuzzleAttempts = async () => {
+  const resetPuzzleAttempts = useCallback(async () => {
     try {
       const response = await fetch(`/api/game/puzzles/${puzzleId}/reset-attempts`, {
         method: 'POST',
@@ -144,10 +131,51 @@ export default function PuzzleTerminal({
     } catch (error) {
       console.error('Fehler beim Zurücksetzen der Versuche:', error);
     }
-  };
+  }, [puzzleId]);
+
+  const addCommandToHistory = useCallback((type: 'user' | 'system', command: string) => {
+    const newCommand: TerminalCommand = {
+      type,
+      command,
+      timestamp: new Date()
+    };
+    setCommandHistory(prev => [...prev, newCommand]);
+  }, []);
+
+  const startTimer = useCallback(() => {
+    if (timeLimit && timeLimit > 0) {
+      const timer = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev && prev > 0) {
+            return prev - 1;
+          } else {
+            clearInterval(timer);
+            return 0;
+          }
+        });
+      }, 1000);
+      
+      // Timer-Referenz speichern für Cleanup
+      timerRef.current = timer;
+    }
+  }, [timeLimit]);
+
+  // Prüfe Alarm-Level-Änderungen und setze Versuche zurück
+  useEffect(() => {
+    if (alarmLevel > lastAlarmLevel) {
+      console.log(`Alarm-Level erhöht von ${lastAlarmLevel} auf ${alarmLevel} - setze Versuche zurück`);
+      setLastAlarmLevel(alarmLevel);
+      
+      // Versuche zurücksetzen
+      resetPuzzleAttempts();
+      
+      // Rätsel NICHT schließen - nur Versuche zurücksetzen
+      // Das Rätsel soll weiter spielbar bleiben
+    }
+  }, [alarmLevel, lastAlarmLevel, resetPuzzleAttempts]);
 
   // Puzzle laden
-  const loadPuzzle = async () => {
+  const loadPuzzle = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -213,7 +241,7 @@ export default function PuzzleTerminal({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleId, puzzleData, startTimer, addCommandToHistory]);
 
   useEffect(() => {
     if (puzzleData) {
@@ -228,7 +256,7 @@ export default function PuzzleTerminal({
   // Lade Puzzle-Daten beim ersten Laden
   useEffect(() => {
     loadPuzzle();
-  }, [puzzleId]);
+  }, [loadPuzzle]);
 
   // Reset alle States beim Öffnen des Rätsels
   useEffect(() => {
@@ -240,15 +268,6 @@ export default function PuzzleTerminal({
       setCurrentHintIndex(0);
     }
   }, [puzzleId]);
-
-  const addCommandToHistory = (type: 'user' | 'system', command: string) => {
-    const newCommand: TerminalCommand = {
-      type,
-      command,
-      timestamp: new Date()
-    };
-    setCommandHistory(prev => [...prev, newCommand]);
-  };
 
   const handleSubmit = async (command: string) => {
     if (!command.trim()) return;
@@ -292,10 +311,9 @@ export default function PuzzleTerminal({
       return;
     }
 
-    // Prüfe ob maximale Versuche erreicht sind
+    // Prüfe ob maximale Versuche erreicht sind - ABER NICHT BLOCKIEREN
     if (attempts >= maxAttempts) {
-      addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Alarm-Level wird erhöht!');
-      increaseAlarmLevel('Maximale Versuche im Terminal-Rätsel erreicht');
+      addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Warte auf API-Response...');
       return;
     }
 
@@ -320,24 +338,43 @@ export default function PuzzleTerminal({
         // Versuche aktualisieren
         setAttempts(data.attempts);
 
+        // Alarm-Level-Logik behandeln
+        if (data.alarmLevelIncreased) {
+          console.log(`[DEBUG] Alarm-Level erhöht auf ${data.newAlarmLevel}`);
+          addCommandToHistory('system', `🚨 ALARM LEVEL ERHÖHT auf ${data.newAlarmLevel}/10!`);
+          
+          if (data.isFirstAlarmLevel) {
+            // Erstes Alarm-Level: Modal wird automatisch vom Game-Context angezeigt
+            console.log('[DEBUG] Erstes Alarm-Level - Modal wird angezeigt');
+            addCommandToHistory('system', 'Erstes Alarm-Level erreicht - Erklärung wird angezeigt');
+          } else {
+            // Weiteres Alarm-Level: Normale Benachrichtigung
+            console.log('[DEBUG] Weiteres Alarm-Level - Normale Benachrichtigung');
+            addCommandToHistory('system', 'Weiteres Alarm-Level erreicht - Sei vorsichtiger!');
+          }
+          
+          onClose();
+          setTimeout(() => {
+            addAlarmNotifyNotification('Dein Alarm Level ist gestiegen!');
+            onSolve(puzzleId, false, true);
+          }, 300);
+          return;
+        }
+
         if (data.isCorrect) {
           addCommandToHistory('system', `${data.message}\nRätsel gelöst!`);
           
-          onSolve(puzzleId, true);
+          onSolve(puzzleId, true, false);
         } else {
           addCommandToHistory('system', `${data.message}\nVersuche: ${data.attempts}/${data.maxAttempts}`);
-          
-          // Prüfe ob maximale Versuche erreicht sind
-          if (data.maxAttemptsReached) {
-            addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Alarm-Level wird erhöht!');
-            increaseAlarmLevel('Maximale Versuche im Terminal-Rätsel erreicht');
-          }
         }
       } else {
         // Prüfe ob es ein "Maximale Versuche" Fehler ist
         if (data.error && data.error.includes('Maximale Anzahl Versuche')) {
-          addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Alarm-Level wird erhöht!');
-          increaseAlarmLevel('Maximale Versuche im Terminal-Rätsel erreicht');
+          addCommandToHistory('system', 'Maximale Anzahl Versuche erreicht. Puzzle wird geschlossen!');
+          setTimeout(() => {
+            onClose();
+          }, 3000);
         } else {
           addCommandToHistory('system', `Fehler: ${data.error || 'Unbekannter Fehler'}`);
         }
@@ -398,22 +435,6 @@ export default function PuzzleTerminal({
       case 4: return 'Schwer';
       case 5: return 'Sehr schwer';
       default: return 'Unbekannt';
-    }
-  };
-
-  const startTimer = () => {
-    if (timeLimit && timeLimit > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev === null || prev <= 1) {
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
     }
   };
 
@@ -493,201 +514,203 @@ export default function PuzzleTerminal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-4xl mx-4"
-      >
-        <Card className="bg-black/90 border-green-500 text-green-400">
-          <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <CardTitle className="text-xl text-green-400 flex items-center gap-2">
-                <Terminal className="h-5 w-5" />
-                {puzzleData.name}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge className={`${getDifficultyColor(puzzleData.difficulty)} text-white`}>
-                  {getDifficultyText(puzzleData.difficulty)}
-                </Badge>
-                {puzzleData.timeLimitSeconds && (
-                  <Badge variant="outline" className="border-yellow-500 text-yellow-400">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {timeRemaining !== null ? `${Math.floor(timeRemaining / 60)}:${(timeRemaining % 60).toString().padStart(2, '0')}` : '--:--'}
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-full max-w-4xl mx-4"
+        >
+          <Card className="bg-black/90 border-green-500 text-green-400">
+            <CardHeader>
+              <div className="flex items-center justify-between mb-4">
+                <CardTitle className="text-xl text-green-400 flex items-center gap-2">
+                  <Terminal className="h-5 w-5" />
+                  {puzzleData.name}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge className={`${getDifficultyColor(puzzleData.difficulty)} text-white`}>
+                    {getDifficultyText(puzzleData.difficulty)}
                   </Badge>
+                  {puzzleData.timeLimitSeconds && (
+                    <Badge variant="outline" className="border-yellow-500 text-yellow-400">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {timeRemaining !== null ? `${Math.floor(timeRemaining / 60)}:${(timeRemaining % 60).toString().padStart(2, '0')}` : '--:--'}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              
+              <p className="text-gray-300 text-sm mb-4">{puzzleData.description}</p>
+
+              {/* Versuche */}
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Versuche: {attempts}/{puzzleData.maxAttempts}</span>
+                <span>Hinweise: {currentHintIndex}/{puzzleData.hints?.length || 0}</span>
+                {puzzleData.timeLimitSeconds && timeRemaining !== null && (
+                  <span>Zeit: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}</span>
                 )}
               </div>
-            </div>
-            
-            <p className="text-gray-300 text-sm mb-4">{puzzleData.description}</p>
+            </CardHeader>
 
-            {/* Versuche */}
-            <div className="flex justify-between text-xs text-gray-400">
-              <span>Versuche: {attempts}/{puzzleData.maxAttempts}</span>
-              <span>Hinweise: {currentHintIndex}/{puzzleData.hints?.length || 0}</span>
-              {puzzleData.timeLimitSeconds && timeRemaining !== null && (
-                <span>Zeit: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}</span>
+            <CardContent className="space-y-6">
+              {/* Zeitlimit-Warnung */}
+              {timeRemaining !== null && timeRemaining <= 30 && timeRemaining > 0 && (
+                <Alert className="border-red-500 bg-red-500/10">
+                  <Clock className="h-4 w-4 text-red-400" />
+                  <AlertDescription className="text-red-400">
+                    Nur noch {timeRemaining} Sekunden!
+                  </AlertDescription>
+                </Alert>
               )}
-            </div>
-          </CardHeader>
 
-          <CardContent className="space-y-6">
-            {/* Zeitlimit-Warnung */}
-            {timeRemaining !== null && timeRemaining <= 30 && timeRemaining > 0 && (
-              <Alert className="border-red-500 bg-red-500/10">
-                <Clock className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-red-400">
-                  Nur noch {timeRemaining} Sekunden!
-                </AlertDescription>
-              </Alert>
-            )}
+              {/* Hinweis */}
+              {showHint && puzzleData.hints[currentHintIndex - 1] && (
+                <Alert className="border-yellow-500 bg-yellow-500/10">
+                  <Lightbulb className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription className="text-yellow-400">
+                    {puzzleData.hints[currentHintIndex - 1]}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            {/* Hinweis */}
-            {showHint && puzzleData.hints[currentHintIndex - 1] && (
-              <Alert className="border-yellow-500 bg-yellow-500/10">
-                <Lightbulb className="h-4 w-4 text-yellow-400" />
-                <AlertDescription className="text-yellow-400">
-                  {puzzleData.hints[currentHintIndex - 1]}
-                </AlertDescription>
-              </Alert>
-            )}
+              {/* Ergebnis */}
+              <AnimatePresence>
+                {showResult && (
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                  >
+                    <Alert className={isCorrect ? "border-green-500 bg-green-500/10" : "border-red-500 bg-red-500/10"}>
+                      {isCorrect ? (
+                        <CheckCircle className="h-4 w-4 text-green-400" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-400" />
+                      )}
+                      <AlertDescription className={isCorrect ? "text-green-400" : "text-red-400"}>
+                        {isCorrect 
+                          ? 'Richtige Antwort! Rätsel gelöst!' 
+                          : 'Falsche Antwort. Versuche es nochmal!'
+                        }
+                      </AlertDescription>
+                    </Alert>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            {/* Ergebnis */}
-            <AnimatePresence>
-              {showResult && (
+              {/* Trophäe - Rätsel gelöst */}
+              {showTrophy && (
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
+                  className="p-4 bg-green-500/10 border border-green-500 rounded-lg text-center"
                 >
-                  <Alert className={isCorrect ? "border-green-500 bg-green-500/10" : "border-red-500 bg-red-500/10"}>
-                    {isCorrect ? (
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-400" />
-                    )}
-                    <AlertDescription className={isCorrect ? "text-green-400" : "text-red-400"}>
-                      {isCorrect 
-                        ? 'Richtige Antwort! Rätsel gelöst!' 
-                        : 'Falsche Antwort. Versuche es nochmal!'
-                      }
-                    </AlertDescription>
-                  </Alert>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Trophäe - Rätsel gelöst */}
-            {showTrophy && (
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="p-4 bg-green-500/10 border border-green-500 rounded-lg text-center"
-              >
-                <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-green-400 mb-2">Terminal-Rätsel gelöst!</h3>
-                <p className="text-gray-300 mb-4">Glückwunsch! Du hast das Terminal-Rätsel erfolgreich abgeschlossen.</p>
-                <Button
-                  onClick={() => onSolve(puzzleId, true)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  Rätsel schließen
-                </Button>
-              </motion.div>
-            )}
-
-            {/* Terminal-Ausgabe */}
-            {!showTrophy && (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <Terminal className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    Terminal
-                  </h3>
-                  <p className="text-gray-400 text-sm">
-                    Gib Befehle ein, um das Rätsel zu lösen
-                  </p>
-                </div>
-
-                <div className="bg-gray-900 border border-gray-600 rounded-lg p-4 font-mono text-sm h-48 overflow-y-auto" ref={terminalRef}>
-                  <div className="space-y-2">
-                    {commandHistory.map((cmd, index) => (
-                      <div key={index} className="mb-2">
-                        <div className="text-green-400">
-                          {cmd.type === 'user' ? '$ ' : ''}{cmd.command}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Befehlszeile */}
-                <div className="flex items-center space-x-2 bg-gray-900 border border-gray-600 rounded-lg p-3">
-                  <span className="text-blue-400 font-mono">$</span>
-                  <Input
-                    ref={inputRef}
-                    type="text"
-                    value={currentCommand}
-                    onChange={(e) => setCurrentCommand(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Befehl eingeben..."
-                    className="flex-1 bg-transparent text-green-400 font-mono border-none focus:ring-0 placeholder-gray-500"
-                    disabled={isSubmitting}
-                  />
+                  <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-green-400 mb-2">Terminal-Rätsel gelöst!</h3>
+                  <p className="text-gray-300 mb-4">Glückwunsch! Du hast das Terminal-Rätsel erfolgreich abgeschlossen.</p>
                   <Button
-                    onClick={() => handleSubmit(currentCommand)}
-                    disabled={!currentCommand.trim() || isSubmitting}
-                    size="sm"
+                    onClick={() => onSolve(puzzleId, true)}
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    {isSubmitting ? '...' : <ChevronRight className="h-4 w-4" />}
+                    Rätsel schließen
                   </Button>
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
 
-            {/* Aktionen */}
-            {!showTrophy && (
-              <div className="flex justify-between items-center pt-4">
-                <div className="flex gap-2">
-                  {/* Hinweis-Button */}
-                  {puzzleData.hints?.length > 0 && currentHintIndex < puzzleData.hints.length && (
+              {/* Terminal-Ausgabe */}
+              {!showTrophy && (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <Terminal className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      Terminal
+                    </h3>
+                    <p className="text-gray-400 text-sm">
+                      Gib Befehle ein, um das Rätsel zu lösen
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-900 border border-gray-600 rounded-lg p-4 font-mono text-sm h-48 overflow-y-auto" ref={terminalRef}>
+                    <div className="space-y-2">
+                      {commandHistory.map((cmd, index) => (
+                        <div key={index} className="mb-2">
+                          <div className="text-green-400">
+                            {cmd.type === 'user' ? '$ ' : ''}{cmd.command}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Befehlszeile */}
+                  <div className="flex items-center space-x-2 bg-gray-900 border border-gray-600 rounded-lg p-3">
+                    <span className="text-blue-400 font-mono">$</span>
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      value={currentCommand}
+                      onChange={(e) => setCurrentCommand(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Befehl eingeben..."
+                      className="flex-1 bg-transparent text-green-400 font-mono border-none focus:ring-0 placeholder-gray-500"
+                      disabled={isSubmitting}
+                    />
                     <Button
-                      onClick={() => handleSubmit('hint')}
-                      variant="outline"
+                      onClick={() => handleSubmit(currentCommand)}
+                      disabled={!currentCommand.trim() || isSubmitting}
                       size="sm"
-                      className="ml-2"
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
-                      Hinweis
+                      {isSubmitting ? '...' : <ChevronRight className="h-4 w-4" />}
                     </Button>
-                  )}
+                  </div>
                 </div>
+              )}
 
-                <div className="flex gap-2">
-                  <Button
-                    onClick={onClose}
-                    variant="outline"
-                    className="border-gray-500 text-gray-400 hover:bg-gray-500/10"
-                    disabled={isSubmitting}
-                  >
-                    Abbrechen
-                  </Button>
+              {/* Aktionen */}
+              {!showTrophy && (
+                <div className="flex justify-between items-center pt-4">
+                  <div className="flex gap-2">
+                    {/* Hinweis-Button */}
+                    {puzzleData.hints?.length > 0 && currentHintIndex < puzzleData.hints.length && (
+                      <Button
+                        onClick={() => handleSubmit('hint')}
+                        variant="outline"
+                        size="sm"
+                        className="ml-2"
+                      >
+                        Hinweis
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={onClose}
+                      variant="outline"
+                      className="border-gray-500 text-gray-400 hover:bg-gray-500/10"
+                      disabled={isSubmitting}
+                    >
+                      Abbrechen
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Maximale Versuche erreicht */}
-            {attempts >= puzzleData.maxAttempts && (
-              <Alert className="border-red-500 bg-red-500/10">
-                <XCircle className="h-4 w-4 text-red-400" />
-                <AlertDescription className="text-red-400">
-                  Maximale Anzahl Versuche erreicht. Das Terminal-Rätsel ist gescheitert.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+              {/* Maximale Versuche erreicht */}
+              {attempts >= puzzleData.maxAttempts && (
+                <Alert className="border-red-500 bg-red-500/10">
+                  <XCircle className="h-4 w-4 text-red-400" />
+                  <AlertDescription className="text-red-400">
+                    Maximale Anzahl Versuche erreicht. Das Terminal-Rätsel ist gescheitert.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </>
   );
 } 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuerySingle, executeQuery } from '@/lib/database';
+import { getUploadUrl } from '@/lib/utils';
 
 /**
  * Raumdaten abrufen
@@ -224,9 +225,7 @@ export async function GET(request: NextRequest) {
         roomId: roomData.room_id,
         name: roomData.name,
         description: roomData.description,
-        backgroundImage: roomData.background_image 
-          ? `/uploads/${roomData.background_image}`
-          : '/uploads/room-bedroom.png',
+        backgroundImage: getUploadUrl(roomData.background_image),
         ambientSound: roomData.ambient_sound,
         isLocked: roomData.is_locked,
         requiredLevel: roomData.required_level,

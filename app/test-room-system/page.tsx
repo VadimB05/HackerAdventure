@@ -82,7 +82,7 @@ export default function TestRoomSystem() {
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span className="text-sm">"Weiter"-Button</span>
+                      <span className="text-sm">&quot;Weiter&quot;-Button</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-400" />

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 
 interface MissionRestartButtonProps {
   missionId: string

@@ -1,16 +1,10 @@
 "use client"
 
-import { useGameState } from "./game-context"
-import Terminal from "./terminal"
-import Smartphone from "./smartphone"
-import PointAndClick from "./point-and-click"
-// import DarknetChat from "./darknet-chat"
+import { useGame } from '@/lib/contexts/game-context'
+import { useGameState } from '@/lib/contexts/game-context'
 import GameState from "./game-state"
 import Basement from "./basement"
-import DecisionModal from "./decision-modal"
 import StoryPopup from "./story-popup"
-import HackingMission from "./hacking-mission"
-import TerminalMission from "./terminal-mission"
 import MoneyPopup from "./money-popup"
 import RoomView from "./room-view"
 import GameOverScreen from "./game-over-screen"
@@ -26,7 +20,7 @@ interface GameLayoutProps {
 }
 
 export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
-  const { currentView, setCurrentView, bitcoinBalance } = useGameState()
+  const { currentView, setCurrentView, bitcoinBalance } = useGame()
   
   // Inventar-State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -45,8 +39,21 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
 
   // Prüfe IntroModal-Status beim Laden
   useEffect(() => {
+    console.log('[DEBUG] useEffect: checkIntroModal (GameLayout) MOUNTED');
+    
+    // Session-basierter Schutz: Prüfe ob der Check bereits in dieser Session durchgeführt wurde
+    const sessionKey = 'introModalChecked';
+    const hasCheckedThisSession = sessionStorage.getItem(sessionKey);
+    
+    if (hasCheckedThisSession) {
+      console.log('[DEBUG] IntroModal-Check bereits in dieser Session durchgeführt, überspringe');
+      setIntroModalChecked(true);
+      return;
+    }
+    
     const checkIntroModal = async () => {
       try {
+        console.log('[DEBUG] Führe IntroModal-Check durch...');
         const authResponse = await fetch('/api/auth/verify', {
           method: 'GET',
           credentials: 'include'
@@ -54,12 +61,14 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
         if (!authResponse.ok) {
           setShowIntroModal(true);
           setIntroModalChecked(true);
+          sessionStorage.setItem(sessionKey, 'true');
           return;
         }
         const authData = await authResponse.json();
         if (!authData.user || !authData.user.id) {
           setShowIntroModal(true);
           setIntroModalChecked(true);
+          sessionStorage.setItem(sessionKey, 'true');
           return;
         }
         const saveRes = await fetch(`/api/game/save?userId=${authData.user.id}`, {
@@ -69,6 +78,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
         if (!saveRes.ok) {
           setShowIntroModal(true);
           setIntroModalChecked(true);
+          sessionStorage.setItem(sessionKey, 'true');
           return;
         }
         const saveData = await saveRes.json();
@@ -77,9 +87,12 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
         console.log('Found intro_modal_completed savepoint:', found);
         setShowIntroModal(!found);
         setIntroModalChecked(true);
+        sessionStorage.setItem(sessionKey, 'true');
       } catch (e) {
+        console.error('[DEBUG] Fehler beim IntroModal-Check:', e);
         setShowIntroModal(true);
         setIntroModalChecked(true);
+        sessionStorage.setItem(sessionKey, 'true');
       }
     }
     checkIntroModal();
@@ -87,11 +100,13 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
 
   // Inventar beim Laden abrufen
   useEffect(() => {
+    console.log('[DEBUG] useEffect: loadInventory (GameLayout) MOUNTED');
     loadInventory();
   }, []);
 
   // Setze die richtige View basierend auf dem initialen Raum
   useEffect(() => {
+    console.log('[DEBUG] useEffect: setCurrentView (GameLayout) MOUNTED');
     // Prüfe URL-Parameter für den initialen Raum
     const urlParams = new URLSearchParams(window.location.search);
     const initialRoom = urlParams.get('room');
@@ -352,10 +367,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
           onIntroModalComplete?.();
         }} 
       />
-      <DecisionModal />
       <StoryPopup />
-      <HackingMission />
-      <TerminalMission />
       <MoneyPopup />
       <GameOverScreen />
       

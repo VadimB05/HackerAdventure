@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { Button } from "@/components/ui/button"
 import { Shield, Wifi, Headphones, Brain } from "lucide-react"
 

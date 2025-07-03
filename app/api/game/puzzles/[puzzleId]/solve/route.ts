@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth-utils';
 import { executeQuerySingle, executeQuery, executeTransaction, executeTransactionCommand } from '@/lib/database';
 import crypto from 'crypto';
 import { addPuzzleInteractionLog } from '@/lib/services/puzzle-service';
+import { AlarmLevelService } from '@/lib/services/alarm-level-service';
 
 export async function POST(
   request: NextRequest,
@@ -151,13 +152,6 @@ export async function POST(
         }, { status: 400 });
       }
 
-      // Prüfen ob maximale Versuche erreicht - ABER NICHT BLOCKIEREN
-      const currentAttempts = progress?.attempts || 0;
-      const maxAttemptsReached = currentAttempts >= puzzle.max_attempts;
-      
-      // Wenn maximale Versuche erreicht sind, trotzdem weitermachen
-      // Die Puzzle-Komponenten werden das Alarm-Level erhöhen
-
       // Rätsel-spezifische Daten strukturieren
       const structuredData: any = {};
       puzzleData.forEach(row => {
@@ -294,8 +288,8 @@ export async function POST(
       await addPuzzleInteractionLog({
         userId,
         puzzleId,
-        actionType: isCorrect ? 'solved' : (currentAttempts >= puzzle.max_attempts ? 'failed' : 'attempted'),
-        attemptNumber: currentAttempts + 1,
+        actionType: isCorrect ? 'solved' : (progress?.attempts || 0 >= puzzle.max_attempts ? 'failed' : 'attempted'),
+        attemptNumber: (progress?.attempts || 0) + 1,
         timeSpentSeconds: timeSpent || null,
         userInput: JSON.stringify(answer),
         isCorrect,
@@ -306,9 +300,17 @@ export async function POST(
       // Transaktion starten
       const transactionQueries = [];
 
-      // Versuch registrieren (nur wenn nicht bereits bei Maximum)
-      const newAttempts = maxAttemptsReached ? currentAttempts : currentAttempts + 1;
-      
+      // Versuch registrieren (immer +1, außer schon max)
+      let newAttempts = progress?.attempts || 0;
+      if (!progress || !progress.is_completed) {
+        newAttempts = (progress?.attempts || 0) + 1;
+      }
+
+      // Jetzt prüfen, ob das Maximum erreicht ist
+      const maxAttemptsNowReached = newAttempts >= puzzle.max_attempts;
+      console.log('[DEBUG] newAttempts:', newAttempts, 'max:', puzzle.max_attempts, 'isCorrect:', isCorrect);
+      console.log('[DEBUG] maxAttemptsNowReached:', maxAttemptsNowReached);
+
       if (progress) {
         // Bestehenden Fortschritt aktualisieren
         transactionQueries.push({
@@ -323,7 +325,7 @@ export async function POST(
         });
       }
 
-      if (isCorrect && !maxAttemptsReached) {
+      if (isCorrect && !maxAttemptsNowReached) {
         // Rätsel als gelöst markieren (nur wenn nicht bei Maximum)
         transactionQueries.push({
           query: 'UPDATE puzzle_progress SET is_completed = true, completed_at = NOW() WHERE user_id = ? AND puzzle_id = ?',
@@ -447,26 +449,57 @@ export async function POST(
         }
       }
 
+      // Alarm-Level-Logik NUR wenn jetzt Maximum erreicht und NICHT korrekt
+      let alarmLevelIncreased = false;
+      let isFirstAlarmLevel = false;
+      let newAlarmLevel = 0;
+      if (maxAttemptsNowReached && !isCorrect) {
+        console.log('[DEBUG] ALARM-LEVEL wird erhöht!');
+        // Aktuelles Alarm-Level abrufen
+        const currentAlarmStats = await AlarmLevelService.getPlayerAlarmStats(userId);
+        const wasFirstAlarmLevel = currentAlarmStats.current_alarm_level === 0;
+        // Mission-ID ermitteln
+        const missionId = await executeQuerySingle<{mission_id: string}>(
+          'SELECT mission_id FROM rooms WHERE room_id = ?',
+          [puzzle.room_id]
+        );
+        // Alarm-Level erhöhen
+        const alarmResult = await AlarmLevelService.increaseAlarmLevel(
+          userId,
+          `Maximale Versuche im Rätsel "${puzzle.name}" erreicht`,
+          puzzleId,
+          missionId?.mission_id || undefined
+        );
+        if (alarmResult.success) {
+          alarmLevelIncreased = true;
+          isFirstAlarmLevel = wasFirstAlarmLevel;
+          newAlarmLevel = alarmResult.newLevel;
+          // Versuche auf 0 zurücksetzen (als letzten Schritt in der Transaktion)
+          transactionQueries.push({
+            query: 'UPDATE puzzle_progress SET attempts = 0 WHERE user_id = ? AND puzzle_id = ?',
+            params: [userId, puzzleId]
+          });
+          // KEIN Savepoint mehr für Alarm-Level!
+        }
+      }
+
       // Transaktion ausführen
       await executeTransaction(transactionQueries);
 
       // Bei maximalen Versuchen immer false zurückgeben
-      const finalIsCorrect = maxAttemptsReached ? false : isCorrect;
-      const finalMessage = maxAttemptsReached ? 'Maximale Anzahl Versuche erreicht' : validationMessage;
+      const finalIsCorrect = maxAttemptsNowReached ? false : isCorrect;
+      const finalMessage = maxAttemptsNowReached ? 'Maximale Anzahl Versuche erreicht' : validationMessage;
 
       return NextResponse.json({
         success: true,
         isCorrect: finalIsCorrect,
         message: finalMessage,
-        attempts: newAttempts,
+        attempts: maxAttemptsNowReached ? 0 : newAttempts, // Versuche auf 0 wenn Alarm-Level erhöht
         maxAttempts: puzzle.max_attempts,
-        maxAttemptsReached: maxAttemptsReached,
-        // KEINE Rätsel-Belohnungen mehr - nur Mission-Belohnungen
-        // rewards: finalIsCorrect ? {
-        //   bitcoins: puzzle.reward_bitcoins,
-        //   exp: puzzle.reward_exp,
-        //   items: JSON.parse(puzzle.reward_items || '[]')
-        // } : null
+        maxAttemptsReached: maxAttemptsNowReached,
+        alarmLevelIncreased,
+        isFirstAlarmLevel,
+        newAlarmLevel,
       });
 
     } catch (error) {

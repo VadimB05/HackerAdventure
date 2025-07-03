@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuery, executeQuerySingle } from '@/lib/database';
+import { getUploadUrl } from '@/lib/utils';
 
 /**
  * Spezifischen Raum abrufen
@@ -157,9 +158,7 @@ export async function GET(
         };
       });
 
-      const backgroundPath = room.background_image 
-        ? `/uploads/${room.background_image}`
-        : '/uploads/room-bedroom.png';
+      const backgroundPath = getUploadUrl(room.background_image);
       
       const roomData = {
         id: room.room_id,

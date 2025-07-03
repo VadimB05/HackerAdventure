@@ -1,6 +1,6 @@
 "use client"
 
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, RotateCcw } from "lucide-react"
 

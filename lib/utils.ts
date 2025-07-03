@@ -16,3 +16,18 @@ export function formatTimestamp(timestamp: string): string {
     minute: "2-digit",
   })
 }
+
+// Hilfsfunktion für MySQL-kompatible Zeitstempel
+export function toMySQLTimestamp(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// Hilfsfunktion für Upload-URLs
+export function getUploadUrl(filename: string | null | undefined): string {
+  if (!filename) {
+    return '/uploads/placeholder.jpg';
+  }
+  
+  // Verwende die API-Route für Upload-Dateien
+  return `/api/uploads/${filename}`;
+}

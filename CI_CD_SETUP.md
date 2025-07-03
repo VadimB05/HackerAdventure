@@ -2,27 +2,31 @@
 
 ## Übersicht
 
-Dieses Repository enthält GitHub Actions Workflows für automatisches CI/CD. Wenn du in den `main` Branch pushst, wird automatisch ein Build erstellt und deployed.
+Dieses Repository verwendet GitHub Actions Workflows für automatisches CI/CD. Jeder Push in den `main` Branch erstellt automatisch einen Build und deployed das Projekt.
 
 ## Workflows
 
-### 1. `deploy.yml` - Basis Workflow
+### 1. `deploy.yml` – Basis Workflow (pnpm)
 - Führt Build und Tests aus
 - Lädt Build-Artefakte hoch
 - Enthält Platzhalter für Deployment-Logik
 
-### 2. `deploy-ssh.yml` - Vollständiger SSH-Deployment Workflow
-- Vollständiger CI/CD-Pipeline mit SSH-Deployment
+### 2. `deploy.yml` – SSH-Deployment Workflow (pnpm)
+- Führt eine vollständige CI/CD-Pipeline mit SSH-Deployment aus
 - Verwendet PM2 für Prozess-Management
-- Enthält Health Checks
+- Führt Health Checks nach dem Deployment durch
+
+### 3. `deploy-npm.yml` – Alternative mit npm
+- Verwendet npm anstelle von pnpm
+- Gleiche Funktionalität wie `deploy.yml`
 
 ## Einrichtung
 
 ### 1. GitHub Secrets konfigurieren
 
-Gehe zu deinem GitHub Repository → Settings → Secrets and variables → Actions und füge folgende Secrets hinzu:
+Lege im GitHub Repository unter Settings → Secrets and variables → Actions folgende Secrets an:
 
-#### Für SSH-Deployment (`deploy-ssh.yml`):
+#### Für SSH-Deployment (`deploy.yml`):
 ```
 SERVER_HOST          # IP-Adresse oder Hostname deines Servers
 SERVER_USERNAME      # SSH-Benutzername
@@ -35,20 +39,22 @@ HEALTH_CHECK_URL     # URL für Health Check (z.B. https://deine-domain.com/api/
 #### Für Umgebungsvariablen:
 ```
 DATABASE_URL         # MySQL-Verbindungsstring
-JWT_SECRET          # Secret für JWT-Token
-CUSTOM_KEY          # Weitere Umgebungsvariablen
+JWT_SECRET           # Secret für JWT-Token
+CUSTOM_KEY           # Weitere Umgebungsvariablen
 ```
 
 ### 2. Server vorbereiten
 
-#### Node.js und pnpm installieren:
+#### Node.js und Package Manager installieren:
 ```bash
 # Node.js 18 installieren
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# pnpm installieren
+# pnpm installieren (empfohlen)
 npm install -g pnpm
+
+# Alternativ npm verwenden (npm ist mit Node.js installiert)
 
 # PM2 installieren
 npm install -g pm2
@@ -97,7 +103,7 @@ Du kannst den Workflow auch manuell auslösen:
 
 ## Troubleshooting
 
-### Häufige Probleme:
+### Häufige Probleme
 
 1. **SSH-Verbindung schlägt fehl**
    - Überprüfe die SSH-Key-Konfiguration
@@ -111,7 +117,7 @@ Du kannst den Workflow auch manuell auslösen:
    - Überprüfe, ob PM2 global installiert ist
    - Stelle sicher, dass der Benutzer PM2-Berechtigungen hat
 
-### Logs überprüfen:
+### Logs überprüfen
 ```bash
 # Auf dem Server
 pm2 logs intrusion-hacker-adventure
@@ -120,7 +126,7 @@ pm2 status
 
 ## Anpassungen
 
-### Umgebungsvariablen hinzufügen:
+### Umgebungsvariablen hinzufügen
 Bearbeite die Workflow-Datei und füge weitere Umgebungsvariablen hinzu:
 
 ```yaml
@@ -132,15 +138,8 @@ env:
   # Weitere Variablen hier hinzufügen
 ```
 
-### Deployment-Pfad ändern:
-Ändere `PROJECT_PATH` in den GitHub Secrets oder bearbeite den Workflow direkt.
+### Deployment-Pfad ändern
+Passe `PROJECT_PATH` in den GitHub Secrets oder in der Workflow-Datei an.
 
-### Health Check anpassen:
-Ändere die `HEALTH_CHECK_URL` in den GitHub Secrets oder bearbeite den Workflow.
-
-## Sicherheit
-
-- Verwende immer HTTPS für Health Checks
-- Halte SSH-Keys sicher und rotiere sie regelmäßig
-- Überprüfe regelmäßig die GitHub Actions Logs
-- Verwende starke Secrets für JWT und andere sensitive Daten 
+### Health Check anpassen
+Passe die `HEALTH_CHECK_URL` in den GitHub Secrets oder in der Workflow-Datei an.

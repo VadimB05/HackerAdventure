@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getPuzzle, type PuzzleData } from '@/lib/services/puzzle-service';
 import PuzzleMultipleChoice from './puzzle-multiple-choice';
 import PuzzleCodeInput from './puzzle-code-input';
@@ -8,7 +8,7 @@ import PuzzleTerminal from './puzzle-terminal';
 
 interface PuzzleSystemProps {
   puzzleId: string;
-  onSolve: (puzzleId: string, isCorrect: boolean) => void;
+  onSolve: (puzzleId: string, isCorrect: boolean, alarmLevelIncreased?: boolean) => void;
   onClose: () => void;
   useDebugApi?: boolean;
 }
@@ -23,11 +23,7 @@ export default function PuzzleSystem({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPuzzle();
-  }, [puzzleId]);
-
-  const loadPuzzle = async () => {
+  const loadPuzzle = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -53,8 +49,6 @@ export default function PuzzleSystem({
               difficulty: puzzle.difficulty,
               maxAttempts: puzzle.maxAttempts,
               timeLimitSeconds: puzzle.timeLimitSeconds,
-              rewardMoney: puzzle.rewardMoney || 0.0001,
-              rewardExp: puzzle.rewardExp,
               isRequired: puzzle.isRequired || false,
               isHidden: puzzle.isHidden || false,
               hints: puzzle.hints || [],
@@ -90,10 +84,14 @@ export default function PuzzleSystem({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [puzzleId, useDebugApi]);
 
-  const handleSolve = (puzzleId: string, isCorrect: boolean) => {
-    onSolve(puzzleId, isCorrect);
+  useEffect(() => {
+    loadPuzzle();
+  }, [loadPuzzle]);
+
+  const handleSolve = (puzzleId: string, isCorrect: boolean, alarmLevelIncreased?: boolean) => {
+    onSolve(puzzleId, isCorrect, alarmLevelIncreased);
   };
 
   if (isLoading) {
@@ -102,7 +100,7 @@ export default function PuzzleSystem({
         <div className="bg-black/80 border border-green-500 rounded-lg p-8">
           <div className="text-green-400 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-            <p className="text-lg">Lade Rätsel...</p>
+            <p className="text-lg">Lade R&auml;tsel...</p>
           </div>
         </div>
       </div>
@@ -275,7 +273,7 @@ export default function PuzzleSystem({
           <div className="bg-black/80 border border-red-500 rounded-lg p-8 max-w-md mx-4">
             <div className="text-red-400 text-center">
               <h3 className="text-xl font-bold mb-4">Unbekannter Rätseltyp</h3>
-              <p className="mb-6">Rätseltyp "{puzzleData.type}" wird nicht unterstützt</p>
+              <p className="mb-6">Rätseltyp &quot;{puzzleData.type}&quot; wird nicht unterstützt</p>
               <button
                 onClick={onClose}
                 className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"

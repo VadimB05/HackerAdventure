@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,11 +25,7 @@ export default function TestTerminalPuzzle() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPuzzle, setSelectedPuzzle] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPuzzles();
-  }, []);
-
-  const loadPuzzles = async () => {
+  const loadPuzzles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -66,7 +62,11 @@ export default function TestTerminalPuzzle() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPuzzles();
+  }, [loadPuzzles]);
 
   const getMockTerminalPuzzles = (): Puzzle[] => [
     {

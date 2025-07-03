@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,14 +32,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Prüfen ob User Admin ist
-    checkAdminStatus();
-    // Stats laden
-    loadAdminStats();
-  }, []);
-
-  const checkAdminStatus = async () => {
+  const checkAdminStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/verify');
       if (!response.ok) {
@@ -55,9 +48,9 @@ export default function AdminPage() {
       console.error('Admin check failed:', error);
       router.push('/auth');
     }
-  };
+  }, [router]);
 
-  const loadAdminStats = async () => {
+  const loadAdminStats = useCallback(async () => {
     try {
       // Erst Admin-Status prüfen
       const verifyResponse = await fetch('/api/admin/verify');
@@ -82,7 +75,14 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // Prüfen ob User Admin ist
+    checkAdminStatus();
+    // Stats laden
+    loadAdminStats();
+  }, [checkAdminStatus, loadAdminStats]);
 
   const navigationItems = [
     { 

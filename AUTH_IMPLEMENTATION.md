@@ -1,28 +1,28 @@
-# Authentifizierung - Implementierung
+# Authentifizierung – Implementierung
 
 ## Übersicht
 
-Die Authentifizierung für das INTRUSION-Spiel wurde vollständig implementiert mit:
+Die Authentifizierung für das INTRUSION-Spiel umfasst:
 
-- **Registrierung**: Sichere Benutzerregistrierung mit Validierung
-- **Anmeldung**: JWT-basierte Authentifizierung
-- **Middleware**: Automatische Token-Validierung
-- **UI**: Benutzerfreundliche Login/Register-Seite
+- **Registrierung** mit Validierung
+- **JWT-basierte Anmeldung**
+- **Middleware** für automatische Token-Validierung
+- **Benutzerfreundliche Login/Register-Seite**
 
-## Implementierte Komponenten
+## Komponenten
 
 ### 1. Validierung (`lib/validation.ts`)
 
 - **Zod-Schemas** für Eingabevalidierung
-- **Registrierung-Validierung**:
-  - Username: 3-50 Zeichen, nur alphanumerisch + _ -
+- **Registrierung**:
+  - Username: 3–50 Zeichen, alphanumerisch, `_` und `-` erlaubt
   - Passwort: Mindestens 8 Zeichen, Groß-/Kleinbuchstaben, Zahlen
   - E-Mail: Optional, gültiges Format
   - Passwort-Bestätigung: Muss übereinstimmen
 
 ### 2. Auth-Service (`lib/services/auth-service.ts`)
 
-- **registerUser()**: Benutzerregistrierung mit Passwort-Hashing
+- **registerUser()**: Registriert Benutzer mit Passwort-Hashing
 - **loginUser()**: Anmeldung mit Passwort-Verifikation
 - **getUserById()**: Benutzer abrufen
 - **Automatische Spielstand-Erstellung** für neue Benutzer
@@ -37,7 +37,6 @@ Die Authentifizierung für das INTRUSION-Spiel wurde vollständig implementiert 
   "password": "string"
 }
 ```
-
 **Response (201 Created):**
 ```json
 {
@@ -58,7 +57,6 @@ Die Authentifizierung für das INTRUSION-Spiel wurde vollständig implementiert 
   "password": "string"
 }
 ```
-
 **Response (200 OK):**
 ```json
 {
@@ -85,7 +83,7 @@ Die Authentifizierung für das INTRUSION-Spiel wurde vollständig implementiert 
 ### 4. Middleware (`middleware.ts`)
 
 - **Automatische Token-Validierung** für geschützte Routen
-- **Cookie-basierte Authentifizierung** (httpOnly, secure)
+- **Cookie-basierte Authentifizierung** (`httpOnly`, `secure`)
 - **Automatische Weiterleitung** zur Auth-Seite bei fehlender Authentifizierung
 - **User-Info-Injection** in Request-Headers
 
@@ -103,11 +101,6 @@ Die Authentifizierung für das INTRUSION-Spiel wurde vollständig implementiert 
 - **Passwort-Sichtbarkeit** Toggle
 - **Loading-States** und Error-Handling
 - **Responsive Design** mit Tailwind CSS
-
-#### Test-Seite (`/test-register`)
-- **API-Testing** für Entwickler
-- **Response-Visualisierung**
-- **Debugging-Tools**
 
 ## Sicherheitsfeatures
 
@@ -153,22 +146,18 @@ CREATE TABLE users (
 
 ## Verwendung
 
-### 1. Registrierung testen
+### Registrierung testen
 ```bash
 # Entwicklungsserver starten
-pnpm dev
+pnpm run dev
 
-# Test-Seite aufrufen
-http://localhost:3000/test-register
-```
-
-### 2. Auth-Seite verwenden
+### Auth-Seite verwenden
 ```bash
 # Normale Auth-Seite
 http://localhost:3000/auth
 ```
 
-### 3. API direkt testen
+### API direkt testen
 ```bash
 # Registrierung
 curl -X POST http://localhost:3000/api/auth/register \

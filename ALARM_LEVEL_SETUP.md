@@ -1,8 +1,16 @@
 # Alarm-Level System Setup
 
-## Problem mit Foreign Key Constraints
+## Überblick
 
-Das Alarm-Level-System benötigt neue Datenbank-Tabellen. Falls du den Fehler "#1452 - Kann Kind-Zeile nicht hinzufügen" bekommst, verwende diese manuellen Schritte:
+Das Alarm-Level-System erhöht das Alarm-Level eines Spielers, wenn bei einem Puzzle die maximal erlaubten Fehlversuche erreicht werden. Die Verwaltung erfolgt über die Tabellen `puzzle_progress` und `player_stats`. Die gesamte Logik ist serverseitig und manipulationssicher.
+
+- Das Alarm-Level steigt, wenn ein Spieler bei einem Puzzle die maximal erlaubten Versuche erreicht hat.
+- Nach dem Anstieg werden die Versuche für dieses Puzzle serverseitig auf 0 zurückgesetzt.
+- Der Fortschritt wird über `puzzle_progress` und `player_stats` verwaltet.
+- Die Alarm-UX ist ein zentrales Notify (rot), das mittig angezeigt wird.
+- Die Logik ist serverseitig und kann nicht manipuliert werden.
+
+---
 
 ## Schritt 1: Neue Spalten zu player_stats hinzufügen
 
@@ -82,23 +90,29 @@ WHERE user_id = 1
 ORDER BY created_at DESC;
 ```
 
+## Funktionsweise
+
+- Das Alarm-Level beginnt bei 0 (unsichtbar).
+- Bei jedem Puzzle werden die Fehlversuche gezählt (in `puzzle_progress`).
+- Wenn die maximal erlaubten Versuche erreicht sind, steigt das Alarm-Level.
+- Nach dem Anstieg werden die Versuche für dieses Puzzle serverseitig auf 0 zurückgesetzt.
+- Die Verwaltung läuft über `puzzle_progress` und `player_stats`.
+- Die Alarm-UX ist ein zentrales Notify (rot, "Dein Alarm Level ist gestiegen!"), das mittig angezeigt wird.
+- Die gesamte Logik ist serverseitig und kann nicht manipuliert werden.
+
+## Testen
+
+1. Gehe zu einem Rätsel.
+2. Gib mehrmals eine falsche Antwort ein, bis die maximal erlaubten Versuche erreicht sind.
+3. Das Alarm-Level steigt um 1, die Versuche werden zurückgesetzt.
+4. Es erscheint ein zentrales, rotes Notify: **"Dein Alarm Level ist gestiegen!"**
+5. Das Alarm-Level wird sofort im UI aktualisiert.
+
+---
+
 ## Alternative: Vereinfachtes Script verwenden
 
 Führe das vereinfachte Script aus:
 ```bash
 mysql -u root -p < scripts/setup-alarm-level-simple.sql
-```
-
-## Funktionsweise
-
-Nach dem Setup:
-1. **Alarm-Level beginnt bei 0** (nicht sichtbar)
-2. **Bei Fehlern** wird das Level erhöht
-3. **Ab Level 1** wird "ALARM: X/10" in der oberen Leiste angezeigt
-4. **Bei Level 10** kommt das FBI und das Spiel wird zurückgesetzt
-
-## Testen
-
-1. Gehe zu einem Rätsel
-2. Gib eine falsche Antwort ein
-3. Das Alarm-Level sollte auf 1 steigen und sichtbar werden 
+``` 

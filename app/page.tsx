@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OptionsModal } from '@/components/ui/options-modal';
-import { useGame } from '@/lib/contexts/game-context';
+import { useGame, useGameState } from '@/lib/contexts/game-context';
 import { 
   Play, 
   RotateCcw, 
@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
-  const { user, isLoading, hasGameProgress, startNewGame, continueGame, logout } = useGame();
+  const { user, isLoading, hasGameProgress, startNewGame, logout } = useGame();
+  const { showAlarmLevelModal, alarmLevelModalData, closeAlarmLevelModal } = useGameState();
   const [showOptions, setShowOptions] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
@@ -202,6 +203,18 @@ export default function HomePage() {
                 <Settings className="mr-3 h-6 w-6" />
                 Optionen
               </Button>
+
+              {/* Admin-Panel - nur für Admins sichtbar */}
+              {user && user.isAdmin && (
+                <Button
+                  onClick={() => window.location.href = '/admin'}
+                  variant="outline"
+                  className="w-full h-16 text-xl border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
+                >
+                  <Crown className="mr-3 h-6 w-6" />
+                  Admin-Panel
+                </Button>
+              )}
 
               {/* Abmelden - nur für angemeldete Benutzer */}
               {user && (

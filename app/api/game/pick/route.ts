@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth-utils';
 import { executeQuerySingle, executeUpdate, executeQuery, connectDB } from '@/lib/database';
+import { toMySQLTimestamp } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
           if (gameState) {
             // Savepoint-ID generieren
             const saveId = uuidv4();
-            const timestamp = new Date().toISOString();
+            const timestamp = toMySQLTimestamp();
 
             // Savepoint in der Datenbank erstellen
             await executeUpdate(

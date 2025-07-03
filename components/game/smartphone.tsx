@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { Button } from "@/components/ui/button"
 import { MessageSquare, Bitcoin, Shield, Grid3X3, ArrowLeft } from "lucide-react"
 
