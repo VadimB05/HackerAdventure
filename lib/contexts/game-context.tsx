@@ -133,6 +133,11 @@ export interface LifeLostNotification {
   message: string;
   timestamp: string;
 }
+export interface AlarmNotifyNotification {
+  id: string;
+  message: string;
+  timestamp: string;
+}
 
 interface ExtendedGameContextType extends GameContextType {
   currentView: View;
@@ -168,12 +173,21 @@ interface ExtendedGameContextType extends GameContextType {
   missions: Mission[];
   getMission: (id: string) => Mission | undefined;
   alarmLevel: number;
-  increaseAlarmLevel: (reason: string) => void;
+  increaseAlarmLevel: (reason: string, puzzleName?: string) => void;
   resetAlarmLevel: () => void;
   alarmNotifications: AlarmLevelNotification[];
   removeAlarmNotification: (id: string) => void;
+  showAlarmLevelModal: boolean;
+  alarmLevelModalData: {
+    alarmLevel: number;
+    puzzleName: string;
+  } | null;
+  closeAlarmLevelModal: () => void;
   isGameOver: boolean;
   resetGame: () => void;
+  alarmNotifyNotifications: AlarmNotifyNotification[];
+  addAlarmNotifyNotification: (message: string) => void;
+  removeAlarmNotifyNotification: (id: string) => void;
 }
 
 const GameContext = createContext<ExtendedGameContextType | undefined>(undefined);
@@ -223,23 +237,196 @@ export function GameProvider({
   const [alarmLevel, setAlarmLevel] = useState(0);
   const [alarmNotifications, setAlarmNotifications] = useState<AlarmLevelNotification[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [showAlarmLevelModal, setShowAlarmLevelModal] = useState(false);
+  const [alarmLevelModalData, setAlarmLevelModalData] = useState<{
+    alarmLevel: number;
+    puzzleName: string;
+  } | null>(null);
+  const [alarmNotifyNotifications, setAlarmNotifyNotifications] = useState<AlarmNotifyNotification[]>([]);
 
   const incrementDay = () => setDay((prev) => prev + 1);
   const toggleTimeOfDay = () => setTimeOfDay((prev) => (prev === "day" ? "night" : "day"));
   const addTerminalCommand = (command: string) => setTerminalHistory((prev) => [...prev, command]);
   const addMessage = (sender: string, content: string) => setMessages((prev) => [...prev, { sender, content, timestamp: new Date().toISOString() }]);
   const showStory = (story: StoryPopup) => setCurrentStory(story);
-  const addChatMessage = (groupId: string, message: ChatMessage) => {/* Dummy */};
-  const completeMission = (missionId: string) => {/* Dummy */};
-  const addMoneyNotification = (amount: number, message: string) => {/* Dummy */};
-  const removeMoneyNotification = (id: string) => {/* Dummy */};
-  const testMoneyNotification = () => {/* Dummy */};
+  
+  const addChatMessage = useCallback((groupId: string, message: ChatMessage) => {
+    setChatGroups(prev => prev.map(group => 
+      group.id === groupId 
+        ? { ...group, messages: [...group.messages, message] }
+        : group
+    ));
+  }, []);
+  
+  const completeMission = useCallback((missionId: string) => {
+    setCompletedMissions(prev => [...prev, missionId]);
+  }, []);
+  
+  const addMoneyNotification = useCallback((amount: number, message: string) => {
+    const notification: MoneyNotification = {
+      id: Date.now().toString(),
+      amount,
+      message,
+      timestamp: new Date().toISOString()
+    };
+    setMoneyNotifications(prev => [...prev, notification]);
+    
+    // Automatisch nach 5 Sekunden entfernen
+    setTimeout(() => {
+      setMoneyNotifications(prev => prev.filter(n => n.id !== notification.id));
+    }, 5000);
+  }, []);
+  
+  const removeMoneyNotification = useCallback((id: string) => {
+    setMoneyNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+  
+  const testMoneyNotification = useCallback(() => {
+    addMoneyNotification(0.001, 'Test-Belohnung erhalten!');
+  }, [addMoneyNotification]);
+
   const getMission = (id: string) => missions.find(m => m.id === id);
-  const increaseAlarmLevel = (reason: string) => {/* Dummy */};
-  const resetAlarmLevel = () => {/* Dummy */};
-  const removeAlarmNotification = (id: string) => {/* Dummy */};
-  const resetGame = () => {/* Dummy */};
-  const updateBitcoinBalance = (amount: number, message?: string, skipBackend?: boolean) => {/* Dummy */};
+
+  const increaseAlarmLevel = useCallback(async (reason: string, puzzleName?: string) => {
+    try {
+      if (!user) return;
+      
+      const response = await fetch('/api/game/alarm-level', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: user.id,
+          reason,
+          puzzleId: null,
+          missionId: null
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const newLevel = data.newLevel;
+          const wasFirstTime = alarmLevel === 0;
+          
+          setAlarmLevel(newLevel);
+          
+          // Benachrichtigung hinzufügen
+          const notification: AlarmLevelNotification = {
+            id: Date.now().toString(),
+            level: newLevel,
+            message: reason,
+            timestamp: new Date().toISOString(),
+            isFirstTime: wasFirstTime
+          };
+          
+          setAlarmNotifications(prev => [...prev, notification]);
+          
+          // Beim ersten Alarm-Level: Modal anzeigen
+          if (wasFirstTime && puzzleName) {
+            setAlarmLevelModalData({
+              alarmLevel: newLevel,
+              puzzleName
+            });
+            setShowAlarmLevelModal(true);
+          }
+          
+          // Bei Level 10: Game Over
+          if (newLevel >= 10) {
+            setIsGameOver(true);
+          }
+          
+          console.log(`Alarm-Level erhöht auf ${newLevel}: ${reason}`);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Erhöhen des Alarm-Levels:', error);
+    }
+  }, [user, alarmLevel]);
+
+  const resetAlarmLevel = useCallback(async () => {
+    try {
+      if (!user) return;
+      
+      const response = await fetch('/api/game/alarm-level', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: user.id
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAlarmLevel(0);
+          setAlarmNotifications([]);
+          console.log('Alarm-Level zurückgesetzt');
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Zurücksetzen des Alarm-Levels:', error);
+    }
+  }, [user]);
+
+  const removeAlarmNotification = useCallback((id: string) => {
+    setAlarmNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+
+  const closeAlarmLevelModal = useCallback(() => {
+    setShowAlarmLevelModal(false);
+    setAlarmLevelModalData(null);
+  }, []);
+
+  const resetGame = useCallback(() => {
+    setIsGameOver(false);
+    setAlarmLevel(0);
+    setAlarmNotifications([]);
+    // Weitere Reset-Logik hier...
+  }, []);
+  
+  const updateBitcoinBalance = useCallback(async (amount: number, message?: string, skipBackend?: boolean) => {
+    const newBalance = bitcoinBalance + amount;
+    setBitcoinBalance(newBalance);
+    
+    if (message && amount > 0) {
+      const notification: MoneyNotification = {
+        id: Date.now().toString(),
+        amount,
+        message,
+        timestamp: new Date().toISOString()
+      };
+      setMoneyNotifications(prev => [...prev, notification]);
+      
+      // Automatisch nach 5 Sekunden entfernen
+      setTimeout(() => {
+        setMoneyNotifications(prev => prev.filter(n => n.id !== notification.id));
+      }, 5000);
+    }
+    
+    if (!skipBackend && user) {
+      try {
+        await fetch('/api/game/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            userId: user.id,
+            bitcoins: newBalance
+          }),
+        });
+      } catch (error) {
+        console.error('Fehler beim Speichern des Bitcoin-Guthabens:', error);
+      }
+    }
+  }, [bitcoinBalance, user]);
 
   const checkGameProgress = async (userOverride?: User | null): Promise<boolean> => {
     console.log('checkGameProgress called, user:', userOverride || user);
@@ -300,6 +487,8 @@ export function GameProvider({
         setUser(data.user);
         // Spielstand prüfen
         await checkGameProgress(data.user);
+        // Alarm-Level abrufen
+        await loadAlarmLevel(data.user.id);
       } else {
         setUser(null);
         setGameState(null);
@@ -311,6 +500,24 @@ export function GameProvider({
       setHasGameProgress(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAlarmLevel = async (userId: number) => {
+    try {
+      const response = await fetch(`/api/game/alarm-level?userId=${userId}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.stats) {
+          setAlarmLevel(data.stats.current_alarm_level);
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden des Alarm-Levels:', error);
     }
   };
 
@@ -341,6 +548,37 @@ export function GameProvider({
     }
   }, [user, checkIntroSkipped]);
 
+  // Alarm-Level regelmäßig aktualisieren
+  useEffect(() => {
+    if (!user) return;
+
+    const updateAlarmLevel = async () => {
+      try {
+        const response = await fetch(`/api/game/alarm-level?userId=${user.id}`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.stats) {
+            setAlarmLevel(data.stats.current_alarm_level);
+          }
+        }
+      } catch (error) {
+        console.error('Fehler beim Aktualisieren des Alarm-Levels:', error);
+      }
+    };
+
+    // Sofort aktualisieren
+    updateAlarmLevel();
+
+    // Dann alle 5 Sekunden aktualisieren
+    const interval = setInterval(updateAlarmLevel, 5000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch('/api/auth/login', {
@@ -357,6 +595,7 @@ export function GameProvider({
       if (data.success) {
         setUser(data.user);
         await checkGameProgress(data.user);
+        await loadAlarmLevel(data.user.id);
         return true;
       } else {
         // Bei fehlgeschlagener Anmeldung User-Status zurücksetzen
@@ -460,6 +699,22 @@ export function GameProvider({
     }
   };
 
+  const addAlarmNotifyNotification = useCallback((message: string) => {
+    const notification: AlarmNotifyNotification = {
+      id: Date.now().toString(),
+      message,
+      timestamp: new Date().toISOString()
+    };
+    setAlarmNotifyNotifications(prev => [...prev, notification]);
+    setTimeout(() => {
+      setAlarmNotifyNotifications(prev => prev.filter(n => n.id !== notification.id));
+    }, 4000);
+  }, []);
+
+  const removeAlarmNotifyNotification = useCallback((id: string) => {
+    setAlarmNotifyNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+
   const value: ExtendedGameContextType = {
     currentView, setCurrentView,
     day, incrementDay,
@@ -473,7 +728,8 @@ export function GameProvider({
     currentMission, setCurrentMission, completedMissions, completeMission,
     moneyNotifications, addMoneyNotification, removeMoneyNotification, testMoneyNotification,
     missions, getMission,
-    alarmLevel, increaseAlarmLevel, resetAlarmLevel, alarmNotifications, removeAlarmNotification,
+            alarmLevel, increaseAlarmLevel, resetAlarmLevel, alarmNotifications, removeAlarmNotification,
+        showAlarmLevelModal, alarmLevelModalData, closeAlarmLevelModal,
     isGameOver, resetGame,
     user,
     gameState,
@@ -488,7 +744,10 @@ export function GameProvider({
     logout,
     startNewGame,
     checkGameProgress,
-    loadRoomData
+    loadRoomData,
+    alarmNotifyNotifications,
+    addAlarmNotifyNotification,
+    removeAlarmNotifyNotification
   };
 
   return (

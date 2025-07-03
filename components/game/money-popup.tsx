@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useGameState } from '@/lib/contexts/game-context'
-import { Bitcoin } from "lucide-react"
+import { Bitcoin, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { playSound } from "@/lib/sound-utils"
 
@@ -83,4 +83,56 @@ function MoneyNotification({ amount, message, onRemove }: MoneyNotificationProps
       </div>
     </div>
   )
+}
+
+export function AlarmNotifyPopup() {
+  const { alarmNotifyNotifications, removeAlarmNotifyNotification } = useGameState();
+
+  return (
+    <div className="fixed top-1/2 left-1/2 z-[200] -translate-x-1/2 -translate-y-1/2 flex flex-col gap-2 pointer-events-none">
+      {alarmNotifyNotifications.map((notification) => (
+        <AlarmNotifyNotification
+          key={notification.id}
+          message={notification.message}
+          onRemove={() => removeAlarmNotifyNotification(notification.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function AlarmNotifyNotification({ message, onRemove }: { message: string; onRemove: () => void }) {
+  const [isVisible, setIsVisible] = useState(true);
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  useEffect(() => {
+    const exitTimer = setTimeout(() => {
+      setIsLeaving(true);
+    }, 3500);
+    const removeTimer = setTimeout(() => {
+      setIsVisible(false);
+      onRemove();
+    }, 4000);
+    return () => {
+      clearTimeout(exitTimer);
+      clearTimeout(removeTimer);
+    };
+  }, [onRemove]);
+
+  if (!isVisible) return null;
+
+  return (
+    <div
+      className={cn(
+        "bg-black border border-red-500 text-red-400 p-4 rounded-md shadow-2xl flex items-center justify-center min-w-[260px] max-w-xs mx-auto text-center font-bold text-lg",
+        "transform transition-all duration-500 ease-in-out",
+        "animate-slideIn",
+        isLeaving ? "opacity-0 scale-90" : "opacity-100 scale-100"
+      )}
+      style={{ pointerEvents: "auto" }}
+    >
+      <AlertTriangle className="h-7 w-7 mr-3 text-red-500 animate-pulse" />
+      <span>{message}</span>
+    </div>
+  );
 }

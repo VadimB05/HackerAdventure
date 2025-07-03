@@ -15,6 +15,7 @@ import { changeRoom, getGameProgress } from '@/lib/services/progress-service';
 import GuidedMissionModal from './GuidedMissionModal';
 import Image from 'next/image';
 import { useGameState } from '@/lib/contexts/game-context'
+import { AlarmNotifyPopup } from './money-popup';
 
 interface InteractiveObject {
   id: string;
@@ -1275,6 +1276,8 @@ export default function RoomView({
           await checkMissionCompletion();
         }}
       />
+
+      <AlarmNotifyPopup />
     </div>
   );
 } 

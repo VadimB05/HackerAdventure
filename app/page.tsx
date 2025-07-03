@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OptionsModal } from '@/components/ui/options-modal';
-import { useGame } from '@/lib/contexts/game-context';
+import { useGame, useGameState } from '@/lib/contexts/game-context';
+import AlarmLevelModal from '@/components/game/AlarmLevelModal';
 import { 
   Play, 
   RotateCcw, 
@@ -20,6 +21,7 @@ import {
 
 export default function HomePage() {
   const { user, isLoading, hasGameProgress, startNewGame, logout } = useGame();
+  const { showAlarmLevelModal, alarmLevelModalData, closeAlarmLevelModal } = useGameState();
   const [showOptions, setShowOptions] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
@@ -282,6 +284,14 @@ export default function HomePage() {
 
       {/* Options Modal */}
       <OptionsModal isOpen={showOptions} onClose={() => setShowOptions(false)} />
+      
+      {/* Alarm Level Modal */}
+      <AlarmLevelModal
+        isOpen={showAlarmLevelModal}
+        onClose={closeAlarmLevelModal}
+        alarmLevel={alarmLevelModalData?.alarmLevel || 0}
+        puzzleName={alarmLevelModalData?.puzzleName || ''}
+      />
     </div>
   );
 }

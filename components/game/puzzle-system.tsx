@@ -8,7 +8,7 @@ import PuzzleTerminal from './puzzle-terminal';
 
 interface PuzzleSystemProps {
   puzzleId: string;
-  onSolve: (puzzleId: string, isCorrect: boolean) => void;
+  onSolve: (puzzleId: string, isCorrect: boolean, alarmLevelIncreased?: boolean) => void;
   onClose: () => void;
   useDebugApi?: boolean;
 }
@@ -90,8 +90,8 @@ export default function PuzzleSystem({
     loadPuzzle();
   }, [loadPuzzle]);
 
-  const handleSolve = (puzzleId: string, isCorrect: boolean) => {
-    onSolve(puzzleId, isCorrect);
+  const handleSolve = (puzzleId: string, isCorrect: boolean, alarmLevelIncreased?: boolean) => {
+    onSolve(puzzleId, isCorrect, alarmLevelIncreased);
   };
 
   if (isLoading) {
