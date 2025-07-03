@@ -30,6 +30,7 @@ import {
   Settings,
   Palette
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 
 interface RoomObject {
   id: string;
@@ -474,14 +475,17 @@ export default function ObjectEditor({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ICON_OPTIONS.map(icon => (
-                      <SelectItem key={icon} value={icon}>
-                        <div className="flex items-center gap-2">
-                          <span className="w-4 h-4">{icon}</span>
-                          {icon}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {ICON_OPTIONS.map(icon => {
+                      const IconComponent = LucideIcons[icon] as React.ElementType;
+                      return (
+                        <SelectItem key={icon} value={icon}>
+                          <div className="flex items-center gap-2">
+                            {IconComponent ? <IconComponent className="w-4 h-4" /> : null}
+                            {icon}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
