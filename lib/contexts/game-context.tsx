@@ -84,23 +84,6 @@ interface GameContextType {
 type View = "apartment" | "smartphone" | "basement" | "city";
 type TimeOfDay = "day" | "night";
 
-export interface DecisionOption {
-  id: string;
-  text: string;
-  consequence: string;
-}
-export interface Decision {
-  id: string;
-  title: string;
-  description: string;
-  options: DecisionOption[];
-}
-export interface PlayerDecision {
-  decisionId: string;
-  optionId: string;
-  timestamp: string;
-  consequence: string;
-}
 export interface StoryPopup {
   id: string;
   title?: string;
@@ -168,10 +151,6 @@ interface ExtendedGameContextType extends GameContextType {
   addTerminalCommand: (command: string) => void;
   messages: { sender: string; content: string; timestamp: string }[];
   addMessage: (sender: string, content: string) => void;
-  currentDecision: Decision | null;
-  setCurrentDecision: (decision: Decision | null) => void;
-  playerDecisions: PlayerDecision[];
-  makeDecision: (optionId: string) => void;
   currentStory: StoryPopup | null;
   setCurrentStory: (story: StoryPopup | null) => void;
   showStory: (story: StoryPopup) => void;
@@ -219,8 +198,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [bitcoinRate, setBitcoinRate] = useState(59000);
   const [terminalHistory, setTerminalHistory] = useState<string[]>([]);
   const [messages, setMessages] = useState<{ sender: string; content: string; timestamp: string }[]>([]);
-  const [currentDecision, setCurrentDecision] = useState<Decision | null>(null);
-  const [playerDecisions, setPlayerDecisions] = useState<PlayerDecision[]>([]);
   const [currentStory, setCurrentStory] = useState<StoryPopup | null>(null);
   const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
   const [currentChatGroup, setCurrentChatGroup] = useState<string>("");
@@ -236,7 +213,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const toggleTimeOfDay = () => setTimeOfDay((prev) => (prev === "day" ? "night" : "day"));
   const addTerminalCommand = (command: string) => setTerminalHistory((prev) => [...prev, command]);
   const addMessage = (sender: string, content: string) => setMessages((prev) => [...prev, { sender, content, timestamp: new Date().toISOString() }]);
-  const makeDecision = (optionId: string) => {/* Dummy */};
   const showStory = (story: StoryPopup) => setCurrentStory(story);
   const addChatMessage = (groupId: string, message: ChatMessage) => {/* Dummy */};
   const completeMission = (missionId: string) => {/* Dummy */};
@@ -512,7 +488,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     bitcoinBalance, setBitcoinBalance, bitcoinRate, updateBitcoinBalance,
     terminalHistory, addTerminalCommand,
     messages, addMessage,
-    currentDecision, setCurrentDecision, playerDecisions, makeDecision,
     currentStory, setCurrentStory, showStory,
     chatGroups, currentChatGroup, setCurrentChatGroup, addChatMessage,
     currentMission, setCurrentMission, completedMissions, completeMission,
