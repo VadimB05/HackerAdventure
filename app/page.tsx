@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { OptionsModal } from '@/components/ui/options-modal';
 import { useGame, useGameState } from '@/lib/contexts/game-context';
-import AlarmLevelModal from '@/components/game/AlarmLevelModal';
 import { 
   Play, 
   RotateCcw, 
@@ -284,14 +283,6 @@ export default function HomePage() {
 
       {/* Options Modal */}
       <OptionsModal isOpen={showOptions} onClose={() => setShowOptions(false)} />
-      
-      {/* Alarm Level Modal */}
-      <AlarmLevelModal
-        isOpen={showAlarmLevelModal}
-        onClose={closeAlarmLevelModal}
-        alarmLevel={alarmLevelModalData?.alarmLevel || 0}
-        puzzleName={alarmLevelModalData?.puzzleName || ''}
-      />
     </div>
   );
 }

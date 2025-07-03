@@ -209,7 +209,7 @@ export default function PuzzleMultipleChoice({
     } finally {
       setIsSubmitting(false);
     }
-  }, [puzzleData, isSubmitting, attempts, maxAttempts, selectedAnswer, puzzleId, timeRemaining, onSolve, onClose]);
+  }, [puzzleData, isSubmitting, attempts, maxAttempts, selectedAnswer, puzzleId, timeRemaining, onSolve, onClose, addAlarmNotifyNotification]);
 
   const loadPuzzle = useCallback(async () => {
     try {

@@ -326,7 +326,7 @@ export default function RoomView({
     loadGameProgress();
     loadAvailableExits();
     loadCityMissionStatus();
-  }, [loadRoomData, loadRoomItems, loadGameProgress, loadCityMissionStatus]);
+  }, [roomId, loadRoomData, loadRoomItems, loadGameProgress, loadCityMissionStatus]);
 
   const clearFeedback = () => {
     setShowFeedback(false);
