@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
-  const { user, isLoading, hasGameProgress, startNewGame, continueGame, logout } = useGame();
+  const { user, isLoading, hasGameProgress, startNewGame, logout } = useGame();
   const [showOptions, setShowOptions] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
