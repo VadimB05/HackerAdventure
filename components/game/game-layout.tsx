@@ -40,8 +40,20 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
   // Prüfe IntroModal-Status beim Laden
   useEffect(() => {
     console.log('[DEBUG] useEffect: checkIntroModal (GameLayout) MOUNTED');
+    
+    // Session-basierter Schutz: Prüfe ob der Check bereits in dieser Session durchgeführt wurde
+    const sessionKey = 'introModalChecked';
+    const hasCheckedThisSession = sessionStorage.getItem(sessionKey);
+    
+    if (hasCheckedThisSession) {
+      console.log('[DEBUG] IntroModal-Check bereits in dieser Session durchgeführt, überspringe');
+      setIntroModalChecked(true);
+      return;
+    }
+    
     const checkIntroModal = async () => {
       try {
+        console.log('[DEBUG] Führe IntroModal-Check durch...');
         const authResponse = await fetch('/api/auth/verify', {
           method: 'GET',
           credentials: 'include'
@@ -49,12 +61,14 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
         if (!authResponse.ok) {
           setShowIntroModal(true);
           setIntroModalChecked(true);
+          sessionStorage.setItem(sessionKey, 'true');
           return;
         }
         const authData = await authResponse.json();
         if (!authData.user || !authData.user.id) {
           setShowIntroModal(true);
           setIntroModalChecked(true);
+          sessionStorage.setItem(sessionKey, 'true');
           return;
         }
         const saveRes = await fetch(`/api/game/save?userId=${authData.user.id}`, {
@@ -64,6 +78,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
         if (!saveRes.ok) {
           setShowIntroModal(true);
           setIntroModalChecked(true);
+          sessionStorage.setItem(sessionKey, 'true');
           return;
         }
         const saveData = await saveRes.json();
@@ -72,9 +87,12 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
         console.log('Found intro_modal_completed savepoint:', found);
         setShowIntroModal(!found);
         setIntroModalChecked(true);
+        sessionStorage.setItem(sessionKey, 'true');
       } catch (e) {
+        console.error('[DEBUG] Fehler beim IntroModal-Check:', e);
         setShowIntroModal(true);
         setIntroModalChecked(true);
+        sessionStorage.setItem(sessionKey, 'true');
       }
     }
     checkIntroModal();

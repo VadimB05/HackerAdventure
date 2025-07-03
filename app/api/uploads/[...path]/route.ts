@@ -7,13 +7,11 @@ import { existsSync } from 'fs';
  * API-Route für das Servieren von Upload-Dateien
  * GET /api/uploads/[filename]
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { path: string[] } }
-) {
+export async function GET(request: NextRequest, context: { params: { path: string[] } }) {
   try {
-    // Pfad zur Datei konstruieren
-    const filename = params.path.join('/');
+    // params asynchron extrahieren (für Next.js App Router)
+    const params = await context.params;
+    const filename = Array.isArray(params.path) ? params.path.join('/') : params.path;
     const filePath = join(process.cwd(), 'public', 'uploads', filename);
 
     // Prüfen ob die Datei existiert

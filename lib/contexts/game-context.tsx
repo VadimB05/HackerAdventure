@@ -71,7 +71,7 @@ interface GameContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   startNewGame: () => Promise<void>;
-  checkGameProgress: () => Promise<boolean>;
+  checkGameProgress: (userOverride?: User | null) => Promise<boolean>;
   loadRoomData: (roomId: string) => Promise<{
     room: any;
     puzzles: any[];
@@ -241,10 +241,9 @@ export function GameProvider({
   const resetGame = () => {/* Dummy */};
   const updateBitcoinBalance = (amount: number, message?: string, skipBackend?: boolean) => {/* Dummy */};
 
-  const checkGameProgress = useCallback(async (): Promise<boolean> => {
-    console.log('checkGameProgress called, user:', user);
-    
-    if (!user) {
+  const checkGameProgress = async (userOverride?: User | null): Promise<boolean> => {
+    console.log('checkGameProgress called, user:', userOverride || user);
+    if (!userOverride && !user) {
       console.log('No user, setting hasGameProgress to false');
       setGameState(null);
       setRoomData(null);
@@ -254,33 +253,23 @@ export function GameProvider({
       setHasGameProgress(false);
       return false;
     }
-
     try {
       console.log('Fetching game state from API...');
       const response = await fetch('/api/game/state', {
         method: 'GET',
         credentials: 'include'
       });
-
       if (response.ok) {
         const data = await response.json();
         console.log('Game state API response:', data);
-        console.log('API says hasGameProgress:', data.hasGameProgress);
-        
         setGameState(data.gameState);
         setRoomData(data.roomData);
         setMissionData(data.missionData);
         setSolvedPuzzles(data.solvedPuzzles || []);
         setPlayerStats(data.playerStats);
         setHasGameProgress(data.hasGameProgress);
-        
-        console.log('Setting hasGameProgress to:', data.hasGameProgress);
-        console.log('Game state:', data.gameState);
-        console.log('Solved puzzles:', data.solvedPuzzles);
-        
         return data.hasGameProgress;
       } else {
-        console.log('Game state API failed:', response.status, response.statusText);
         setGameState(null);
         setRoomData(null);
         setMissionData(null);
@@ -290,7 +279,6 @@ export function GameProvider({
         return false;
       }
     } catch (error) {
-      console.error('Game progress check failed:', error);
       setGameState(null);
       setRoomData(null);
       setMissionData(null);
@@ -299,37 +287,32 @@ export function GameProvider({
       setHasGameProgress(false);
       return false;
     }
-  }, [user]);
+  };
 
-  const checkAuthStatus = useCallback(async () => {
+  const checkAuthStatus = async () => {
     try {
       const response = await fetch('/api/auth/verify', {
         method: 'GET',
         credentials: 'include'
       });
-
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-        
         // Spielstand prüfen
-        await checkGameProgress();
+        await checkGameProgress(data.user);
       } else {
-        // Explizit User auf null setzen wenn nicht angemeldet
         setUser(null);
         setGameState(null);
         setHasGameProgress(false);
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
-      // Bei Fehler auch User auf null setzen
       setUser(null);
       setGameState(null);
       setHasGameProgress(false);
     } finally {
       setIsLoading(false);
     }
-  }, [checkGameProgress]);
+  };
 
   const checkIntroSkipped = useCallback(async () => {
     try {
@@ -348,7 +331,8 @@ export function GameProvider({
   // Beim Laden prüfen, ob User angemeldet ist
   useEffect(() => {
     checkAuthStatus();
-  }, [checkAuthStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Prüfe Intro-Speicherpunkt, sobald User gesetzt ist
   useEffect(() => {
@@ -372,7 +356,7 @@ export function GameProvider({
 
       if (data.success) {
         setUser(data.user);
-        await checkGameProgress();
+        await checkGameProgress(data.user);
         return true;
       } else {
         // Bei fehlgeschlagener Anmeldung User-Status zurücksetzen

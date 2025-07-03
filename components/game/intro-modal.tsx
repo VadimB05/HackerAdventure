@@ -39,12 +39,24 @@ const IntroModal: React.FC<IntroModalProps> = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
+      console.log('[DEBUG] useEffect: IntroModal geöffnet, setCurrentStep(0)');
       setCurrentStep(0);
       setIsTyping(true);
     }
   }, [isOpen]);
 
   const saveIntroCompletion = async () => {
+    console.log('[DEBUG] saveIntroCompletion aufgerufen');
+    
+    // Session-basierter Schutz: Prüfe ob der Speichervorgang bereits in dieser Session durchgeführt wurde
+    const sessionKey = 'introModalSaved';
+    const hasSavedThisSession = sessionStorage.getItem(sessionKey);
+    
+    if (hasSavedThisSession) {
+      console.log('[DEBUG] IntroModal-Speichervorgang bereits in dieser Session durchgeführt, überspringe');
+      return;
+    }
+    
     try {
       const authResponse = await fetch('/api/auth/verify', {
         method: 'GET',
@@ -59,14 +71,18 @@ const IntroModal: React.FC<IntroModalProps> = ({ isOpen, onClose }) => {
             data: { reason: 'Intro-Modal abgeschlossen' },
             timestamp: new Date().toISOString()
           });
+          sessionStorage.setItem(sessionKey, 'true');
         }
       }
     } catch (e) {
       console.error('Fehler beim Speichern des Intro-Modal-Speicherpunkts:', e);
+      // Auch bei Fehler als "durchgeführt" markieren, um weitere Versuche zu vermeiden
+      sessionStorage.setItem(sessionKey, 'true');
     }
   };
 
   const handleNext = async () => {
+    console.log('[DEBUG] handleNext aufgerufen, currentStep:', currentStep);
     if (currentStep < steps.length - 1) {
       setIsTyping(false);
       setTimeout(() => {
@@ -80,6 +96,7 @@ const IntroModal: React.FC<IntroModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleSkip = async () => {
+    console.log('[DEBUG] handleSkip aufgerufen');
     await saveIntroCompletion();
     onClose();
   };

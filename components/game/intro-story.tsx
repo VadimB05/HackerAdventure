@@ -25,34 +25,60 @@ export default function IntroStory() {
   // Prüfe beim Mounten, ob ein Speicherpunkt existiert
   useEffect(() => {
     console.log('[DEBUG] useEffect: checkIntroSave (IntroStory) MOUNTED');
+    
+    // Session-basierter Schutz: Prüfe ob der Check bereits in dieser Session durchgeführt wurde
+    const sessionKey = 'introStoryChecked';
+    const hasCheckedThisSession = sessionStorage.getItem(sessionKey);
+    
+    if (hasCheckedThisSession) {
+      console.log('[DEBUG] IntroStory-Check bereits in dieser Session durchgeführt, überspringe');
+      // Verwende den gespeicherten Wert
+      const savedValue = sessionStorage.getItem('introStoryShouldShow');
+      setShouldShowIntro(savedValue === 'true');
+      return;
+    }
+    
     const checkIntroSave = async () => {
       try {
+        console.log('[DEBUG] Führe IntroStory-Check durch...');
         const authResponse = await fetch('/api/auth/verify', {
           method: 'GET',
           credentials: 'include'
         });
         if (!authResponse.ok) {
-          setShouldShowIntro(true)
-          return
+          setShouldShowIntro(true);
+          sessionStorage.setItem(sessionKey, 'true');
+          sessionStorage.setItem('introStoryShouldShow', 'true');
+          return;
         }
         const authData = await authResponse.json();
         if (!authData.user || !authData.user.id) {
-          setShouldShowIntro(true)
-          return
+          setShouldShowIntro(true);
+          sessionStorage.setItem(sessionKey, 'true');
+          sessionStorage.setItem('introStoryShouldShow', 'true');
+          return;
         }
         const saveRes = await fetch(`/api/game/save?userId=${authData.user.id}`, {
           method: 'GET',
           credentials: 'include'
         });
         if (!saveRes.ok) {
-          setShouldShowIntro(true)
-          return
+          setShouldShowIntro(true);
+          sessionStorage.setItem(sessionKey, 'true');
+          sessionStorage.setItem('introStoryShouldShow', 'true');
+          return;
         }
         const saveData = await saveRes.json();
         const found = saveData.savePoints && saveData.savePoints.some((sp: any) => sp.eventType === 'game_started');
-        setShouldShowIntro(!found)
+        const shouldShow = !found;
+        setShouldShowIntro(shouldShow);
+        sessionStorage.setItem(sessionKey, 'true');
+        sessionStorage.setItem('introStoryShouldShow', shouldShow.toString());
       } catch (e) {
-        setShouldShowIntro(true)
+        console.error('[DEBUG] Fehler beim IntroStory-Check:', e);
+        setShouldShowIntro(true);
+        sessionStorage.setItem(sessionKey, 'true');
+        sessionStorage.setItem('introStoryShouldShow', 'true');
       }
     }
     checkIntroSave();
@@ -133,6 +159,15 @@ export default function IntroStory() {
     setShowConfirmDialog(false)
     setConfirmAction(null)
 
+    // Session-basierter Schutz: Prüfe ob der Speichervorgang bereits in dieser Session durchgeführt wurde
+    const sessionKey = 'introStorySkipSaved';
+    const hasSavedThisSession = sessionStorage.getItem(sessionKey);
+    
+    if (hasSavedThisSession) {
+      console.log('[DEBUG] IntroStory-Skip-Speichervorgang bereits in dieser Session durchgeführt, überspringe');
+      return;
+    }
+
     // Speicherpunkt anlegen
     try {
       // Aktuelle User-ID holen
@@ -149,11 +184,13 @@ export default function IntroStory() {
             data: { reason: 'Intro-Sprachnotiz übersprungen' },
             timestamp: new Date().toISOString()
           });
+          sessionStorage.setItem(sessionKey, 'true');
         }
       }
     } catch (e) {
       console.error('Fehler beim Speichern des Intro-Speicherpunkts:', e);
-      // Fehler ignorieren, Spiel geht weiter
+      // Auch bei Fehler als "durchgeführt" markieren, um weitere Versuche zu vermeiden
+      sessionStorage.setItem(sessionKey, 'true');
     }
   }
 
@@ -171,6 +208,15 @@ export default function IntroStory() {
     setShowConfirmDialog(false)
     setConfirmAction(null)
 
+    // Session-basierter Schutz: Prüfe ob der Speichervorgang bereits in dieser Session durchgeführt wurde
+    const sessionKey = 'introStoryCloseSaved';
+    const hasSavedThisSession = sessionStorage.getItem(sessionKey);
+    
+    if (hasSavedThisSession) {
+      console.log('[DEBUG] IntroStory-Close-Speichervorgang bereits in dieser Session durchgeführt, überspringe');
+      return;
+    }
+
     // Speicherpunkt anlegen
     try {
       // Aktuelle User-ID holen
@@ -187,11 +233,13 @@ export default function IntroStory() {
             data: { reason: 'Intro-Sprachnotiz geschlossen' },
             timestamp: new Date().toISOString()
           });
+          sessionStorage.setItem(sessionKey, 'true');
         }
       }
     } catch (e) {
       console.error('Fehler beim Speichern des Intro-Speicherpunkts:', e);
-      // Fehler ignorieren
+      // Auch bei Fehler als "durchgeführt" markieren, um weitere Versuche zu vermeiden
+      sessionStorage.setItem(sessionKey, 'true');
     }
   }
 

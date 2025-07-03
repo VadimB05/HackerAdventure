@@ -73,10 +73,10 @@ export default function GameState() {
         </div>
         <div className="flex items-center">
           <TrendingUp className="h-4 w-4 mr-1" />
-          <span>${safeBitcoinRate.toLocaleString()}</span>
+          <span>${safeBitcoinRate.toLocaleString('de-DE')}</span>
         </div>
         <div className="flex items-center text-green-400">
-          <span>${balanceInUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+          <span>${balanceInUsd.toLocaleString('de-DE', { maximumFractionDigits: 2 })}</span>
         </div>
       </div>
     </div>
