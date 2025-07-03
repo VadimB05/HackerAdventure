@@ -7,7 +7,10 @@ import { existsSync } from 'fs';
  * API-Route für das Servieren von Upload-Dateien
  * GET /api/uploads/[filename]
  */
-export async function GET(request: NextRequest, context: { params: { path: string[] } }) {
+export async function GET(
+  request: NextRequest, 
+  context: { params: Promise<{ path: string[] }> }
+) {
   try {
     // params asynchron extrahieren (für Next.js App Router)
     const params = await context.params;
