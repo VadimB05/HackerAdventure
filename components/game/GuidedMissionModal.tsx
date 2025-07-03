@@ -39,7 +39,6 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
   const [error, setError] = useState<string | null>(null);
   const [puzzleProgress, setPuzzleProgress] = useState<{[key: string]: boolean}>({});
   const [lastAlarmLevel, setLastAlarmLevel] = useState(0);
-  const [showAlarmModal, setShowAlarmModal] = useState(false);
 
   // Überwache Alarm-Level-Änderungen
   useEffect(() => {
@@ -268,7 +267,6 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
   const handlePuzzleSolve = async (puzzleId: string, isCorrect: boolean, alarmLevelIncreased?: boolean) => {
     if (alarmLevelIncreased) {
       onClose();
-      setTimeout(() => setShowAlarmModal(true), 300);
       return;
     }
     if (isCorrect) {
@@ -423,16 +421,6 @@ const GuidedMissionModal: React.FC<GuidedMissionModalProps> = ({ missionId, isOp
               )}
             </>
           ) : null}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={showAlarmModal} onOpenChange={open => setShowAlarmModal(open)}>
-        <DialogContent className="max-w-xs text-center">
-          <DialogHeader>
-            <DialogTitle>Dein Alarm Level ist gestiegen</DialogTitle>
-          </DialogHeader>
-          <Button className="mt-4 w-full" onClick={() => setShowAlarmModal(false)}>
-            OK
-          </Button>
         </DialogContent>
       </Dialog>
     </>

@@ -548,37 +548,6 @@ export function GameProvider({
     }
   }, [user, checkIntroSkipped]);
 
-  // Alarm-Level regelmäßig aktualisieren
-  useEffect(() => {
-    if (!user) return;
-
-    const updateAlarmLevel = async () => {
-      try {
-        const response = await fetch(`/api/game/alarm-level?userId=${user.id}`, {
-          method: 'GET',
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.stats) {
-            setAlarmLevel(data.stats.current_alarm_level);
-          }
-        }
-      } catch (error) {
-        console.error('Fehler beim Aktualisieren des Alarm-Levels:', error);
-      }
-    };
-
-    // Sofort aktualisieren
-    updateAlarmLevel();
-
-    // Dann alle 5 Sekunden aktualisieren
-    const interval = setInterval(updateAlarmLevel, 5000);
-
-    return () => clearInterval(interval);
-  }, [user]);
-
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch('/api/auth/login', {
@@ -700,6 +669,10 @@ export function GameProvider({
   };
 
   const addAlarmNotifyNotification = useCallback((message: string) => {
+    // Alarm-Level sofort neu laden, bevor das Notify angezeigt wird
+    if (user) {
+      loadAlarmLevel(user.id);
+    }
     const notification: AlarmNotifyNotification = {
       id: Date.now().toString(),
       message,
@@ -709,7 +682,7 @@ export function GameProvider({
     setTimeout(() => {
       setAlarmNotifyNotifications(prev => prev.filter(n => n.id !== notification.id));
     }, 4000);
-  }, []);
+  }, [user]);
 
   const removeAlarmNotifyNotification = useCallback((id: string) => {
     setAlarmNotifyNotifications(prev => prev.filter(notification => notification.id !== id));

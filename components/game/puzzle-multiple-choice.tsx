@@ -66,7 +66,6 @@ export default function PuzzleMultipleChoice({
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
   const [showExplanation, setShowExplanation] = useState(false);
   const [isFirstMaxAttempts, setIsFirstMaxAttempts] = useState(false);
-  const [showAlarmModal, setShowAlarmModal] = useState(false);
 
   const { alarmLevel, addAlarmNotifyNotification } = useGameState();
 
@@ -610,17 +609,6 @@ export default function PuzzleMultipleChoice({
           </Card>
         </motion.div>
       </div>
-      {/* Alarm-Level Modal */}
-      <Dialog open={showAlarmModal} onOpenChange={open => setShowAlarmModal(open)}>
-        <DialogContent className="max-w-xs text-center">
-          <DialogHeader>
-            <DialogTitle>Dein Alarm Level ist gestiegen</DialogTitle>
-          </DialogHeader>
-          <Button className="mt-4 w-full" onClick={() => setShowAlarmModal(false)}>
-            OK
-          </Button>
-        </DialogContent>
-      </Dialog>
     </>
   );
 } 

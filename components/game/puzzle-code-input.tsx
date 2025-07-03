@@ -217,8 +217,6 @@ export default function PuzzleCodeInput({
     }
   };
 
-  const [showAlarmModal, setShowAlarmModal] = useState(false);
-
   const handleSubmit = async () => {
     if (!codeInput.trim() || isSubmitting) return;
 
@@ -646,16 +644,6 @@ export default function PuzzleCodeInput({
           </Card>
         </motion.div>
       </div>
-      <Dialog open={showAlarmModal} onOpenChange={open => setShowAlarmModal(open)}>
-        <DialogContent className="max-w-xs text-center">
-          <DialogHeader>
-            <DialogTitle>Dein Alarm Level ist gestiegen</DialogTitle>
-          </DialogHeader>
-          <Button className="mt-4 w-full" onClick={() => setShowAlarmModal(false)}>
-            OK
-          </Button>
-        </DialogContent>
-      </Dialog>
     </>
   );
 } 

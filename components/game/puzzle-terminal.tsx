@@ -63,7 +63,6 @@ export default function PuzzleTerminal({
   const [showResult, setShowResult] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [showTrophy, setShowTrophy] = useState(false);
-  const [showAlarmModal, setShowAlarmModal] = useState(false);
   
   // Timer für Zeitlimit
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -712,16 +711,6 @@ export default function PuzzleTerminal({
           </Card>
         </motion.div>
       </div>
-      <Dialog open={showAlarmModal} onOpenChange={open => setShowAlarmModal(open)}>
-        <DialogContent className="max-w-xs text-center">
-          <DialogHeader>
-            <DialogTitle>Dein Alarm Level ist gestiegen</DialogTitle>
-          </DialogHeader>
-          <Button className="mt-4 w-full" onClick={() => setShowAlarmModal(false)}>
-            OK
-          </Button>
-        </DialogContent>
-      </Dialog>
     </>
   );
 } 
