@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { Bitcoin, TrendingUp, TrendingDown } from "lucide-react"
 
 export default function WalletWidget() {

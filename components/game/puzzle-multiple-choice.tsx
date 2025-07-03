@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, XCircle, Clock, Lightbulb, Trophy, Coins } from 'lucide-react';
-import { useGameState } from './game-context';
+import { useGameState } from '@/lib/contexts/game-context';
 
 interface MultipleChoiceData {
   question: string;

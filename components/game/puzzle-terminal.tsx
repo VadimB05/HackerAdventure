@@ -16,7 +16,7 @@ import {
   Trophy,
   ChevronRight
 } from 'lucide-react';
-import { useGameState } from './game-context';
+import { useGameState } from '@/lib/contexts/game-context';
 import { PuzzleData } from '@/lib/services/puzzle-service';
 
 interface TerminalCommand {

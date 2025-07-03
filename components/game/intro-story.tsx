@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { playSound, stopSound } from "@/lib/sound-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +24,7 @@ export default function IntroStory() {
 
   // Prüfe beim Mounten, ob ein Speicherpunkt existiert
   useEffect(() => {
+    console.log('[DEBUG] useEffect: checkIntroSave (IntroStory) MOUNTED');
     const checkIntroSave = async () => {
       try {
         const authResponse = await fetch('/api/auth/verify', {
@@ -58,6 +59,7 @@ export default function IntroStory() {
   }, []);
 
   useEffect(() => {
+    console.log('[DEBUG] useEffect: showVoiceNote (IntroStory) MOUNTED');
     // Zeige die Sprachnotiz nur beim ersten Laden und nur einmal
     if (!hasShownIntro && shouldShowIntro) {
       const timer = setTimeout(() => {
@@ -71,7 +73,9 @@ export default function IntroStory() {
 
   // Cleanup beim Unmount
   useEffect(() => {
+    console.log('[DEBUG] useEffect: cleanup (IntroStory) MOUNTED');
     return () => {
+      console.log('[DEBUG] useEffect: cleanup (IntroStory) UNMOUNTED');
       // Stoppe Audio beim Unmount
       stopSound(VOICE_NOTE_PATH)
     }

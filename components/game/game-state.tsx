@@ -1,6 +1,6 @@
 "use client"
 
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { Bitcoin, TrendingUp, Clock, AlertTriangle, Info } from "lucide-react"
 
 export default function GameState() {

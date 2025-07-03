@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import PuzzleSystem from './puzzle-system';
-import { useGameState } from './game-context';
+import { useGameState } from '@/lib/contexts/game-context';
 
 interface MissionStep {
   id: string;

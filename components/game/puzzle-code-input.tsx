@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { CheckCircle, XCircle, Clock, Lightbulb, Trophy, Lock, Eye, EyeOff } from 'lucide-react';
 import { solvePuzzle, type PuzzleData } from '@/lib/services/puzzle-service';
-import { useGameState } from './game-context';
+import { useGameState } from '@/lib/contexts/game-context';
 
 interface PuzzleCodeInputProps {
   puzzleId: string;

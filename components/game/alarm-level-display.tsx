@@ -1,6 +1,6 @@
 "use client"
 
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { AlertTriangle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from "react"

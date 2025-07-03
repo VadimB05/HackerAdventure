@@ -1,16 +1,10 @@
 "use client"
 
-import { useGameState } from "./game-context"
-import Terminal from "./terminal"
-import Smartphone from "./smartphone"
-import PointAndClick from "./point-and-click"
-// import DarknetChat from "./darknet-chat"
+import { useGame } from '@/lib/contexts/game-context'
+import { useGameState } from '@/lib/contexts/game-context'
 import GameState from "./game-state"
 import Basement from "./basement"
-import DecisionModal from "./decision-modal"
 import StoryPopup from "./story-popup"
-import HackingMission from "./hacking-mission"
-import TerminalMission from "./terminal-mission"
 import MoneyPopup from "./money-popup"
 import RoomView from "./room-view"
 import GameOverScreen from "./game-over-screen"
@@ -26,7 +20,7 @@ interface GameLayoutProps {
 }
 
 export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
-  const { currentView, setCurrentView, bitcoinBalance } = useGameState()
+  const { currentView, setCurrentView, bitcoinBalance } = useGame()
   
   // Inventar-State
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -45,6 +39,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
 
   // Prüfe IntroModal-Status beim Laden
   useEffect(() => {
+    console.log('[DEBUG] useEffect: checkIntroModal (GameLayout) MOUNTED');
     const checkIntroModal = async () => {
       try {
         const authResponse = await fetch('/api/auth/verify', {
@@ -87,11 +82,13 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
 
   // Inventar beim Laden abrufen
   useEffect(() => {
+    console.log('[DEBUG] useEffect: loadInventory (GameLayout) MOUNTED');
     loadInventory();
   }, []);
 
   // Setze die richtige View basierend auf dem initialen Raum
   useEffect(() => {
+    console.log('[DEBUG] useEffect: setCurrentView (GameLayout) MOUNTED');
     // Prüfe URL-Parameter für den initialen Raum
     const urlParams = new URLSearchParams(window.location.search);
     const initialRoom = urlParams.get('room');
@@ -352,10 +349,7 @@ export default function GameLayout({ onIntroModalComplete }: GameLayoutProps) {
           onIntroModalComplete?.();
         }} 
       />
-      <DecisionModal />
       <StoryPopup />
-      <HackingMission />
-      <TerminalMission />
       <MoneyPopup />
       <GameOverScreen />
       

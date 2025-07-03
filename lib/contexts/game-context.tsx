@@ -81,7 +81,124 @@ interface GameContextType {
   } | null>;
 }
 
-const GameContext = createContext<GameContextType | undefined>(undefined);
+type View = "apartment" | "smartphone" | "basement" | "city";
+type TimeOfDay = "day" | "night";
+
+export interface DecisionOption {
+  id: string;
+  text: string;
+  consequence: string;
+}
+export interface Decision {
+  id: string;
+  title: string;
+  description: string;
+  options: DecisionOption[];
+}
+export interface PlayerDecision {
+  decisionId: string;
+  optionId: string;
+  timestamp: string;
+  consequence: string;
+}
+export interface StoryPopup {
+  id: string;
+  title?: string;
+  content: string[];
+  type: "text" | "dialog" | "voiceMessage" | "mission";
+  speaker?: string;
+  image?: string;
+}
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  content: string;
+  timestamp: string;
+  isSystem?: boolean;
+}
+export interface ChatGroup {
+  id: string;
+  name: string;
+  isFavorite?: boolean;
+  description: string;
+  messages: ChatMessage[];
+  unreadCount?: number;
+}
+export interface MoneyNotification {
+  id: string;
+  amount: number;
+  message: string;
+  timestamp: string;
+}
+export interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  reward: number;
+  type: "guided" | "terminal";
+  steps?: any[];
+  commands?: string[];
+}
+export interface AlarmLevelNotification {
+  id: string;
+  level: number;
+  message: string;
+  timestamp: string;
+  isFirstTime: boolean;
+}
+export interface LifeLostNotification {
+  id: string;
+  message: string;
+  timestamp: string;
+}
+
+interface ExtendedGameContextType extends GameContextType {
+  currentView: View;
+  setCurrentView: (view: View) => void;
+  day: number;
+  incrementDay: () => void;
+  timeOfDay: TimeOfDay;
+  toggleTimeOfDay: () => void;
+  gameTime: number;
+  bitcoinBalance: number;
+  setBitcoinBalance: (balance: number) => void;
+  bitcoinRate: number;
+  updateBitcoinBalance: (amount: number, message?: string, skipBackend?: boolean) => void;
+  terminalHistory: string[];
+  addTerminalCommand: (command: string) => void;
+  messages: { sender: string; content: string; timestamp: string }[];
+  addMessage: (sender: string, content: string) => void;
+  currentDecision: Decision | null;
+  setCurrentDecision: (decision: Decision | null) => void;
+  playerDecisions: PlayerDecision[];
+  makeDecision: (optionId: string) => void;
+  currentStory: StoryPopup | null;
+  setCurrentStory: (story: StoryPopup | null) => void;
+  showStory: (story: StoryPopup) => void;
+  chatGroups: ChatGroup[];
+  currentChatGroup: string;
+  setCurrentChatGroup: (groupId: string) => void;
+  addChatMessage: (groupId: string, message: ChatMessage) => void;
+  currentMission: string | null;
+  setCurrentMission: (missionId: string | null) => void;
+  completedMissions: string[];
+  completeMission: (missionId: string) => void;
+  moneyNotifications: MoneyNotification[];
+  addMoneyNotification: (amount: number, message: string) => void;
+  removeMoneyNotification: (id: string) => void;
+  testMoneyNotification: () => void;
+  missions: Mission[];
+  getMission: (id: string) => Mission | undefined;
+  alarmLevel: number;
+  increaseAlarmLevel: (reason: string) => void;
+  resetAlarmLevel: () => void;
+  alarmNotifications: AlarmLevelNotification[];
+  removeAlarmNotification: (id: string) => void;
+  isGameOver: boolean;
+  resetGame: () => void;
+}
+
+const GameContext = createContext<ExtendedGameContextType | undefined>(undefined);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -94,6 +211,44 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasGameProgress, setHasGameProgress] = useState(false);
   const [hasSkippedIntro, setHasSkippedIntro] = useState(false);
+  const [currentView, setCurrentView] = useState<View>("apartment");
+  const [day, setDay] = useState(1);
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("day");
+  const [gameTime, setGameTime] = useState(480); // Start bei 8:00 Uhr (480 Minuten)
+  const [bitcoinBalance, setBitcoinBalance] = useState(0);
+  const [bitcoinRate, setBitcoinRate] = useState(59000);
+  const [terminalHistory, setTerminalHistory] = useState<string[]>([]);
+  const [messages, setMessages] = useState<{ sender: string; content: string; timestamp: string }[]>([]);
+  const [currentDecision, setCurrentDecision] = useState<Decision | null>(null);
+  const [playerDecisions, setPlayerDecisions] = useState<PlayerDecision[]>([]);
+  const [currentStory, setCurrentStory] = useState<StoryPopup | null>(null);
+  const [chatGroups, setChatGroups] = useState<ChatGroup[]>([]);
+  const [currentChatGroup, setCurrentChatGroup] = useState<string>("");
+  const [currentMission, setCurrentMission] = useState<string | null>(null);
+  const [completedMissions, setCompletedMissions] = useState<string[]>([]);
+  const [moneyNotifications, setMoneyNotifications] = useState<MoneyNotification[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [alarmLevel, setAlarmLevel] = useState(0);
+  const [alarmNotifications, setAlarmNotifications] = useState<AlarmLevelNotification[]>([]);
+  const [isGameOver, setIsGameOver] = useState(false);
+
+  const incrementDay = () => setDay((prev) => prev + 1);
+  const toggleTimeOfDay = () => setTimeOfDay((prev) => (prev === "day" ? "night" : "day"));
+  const addTerminalCommand = (command: string) => setTerminalHistory((prev) => [...prev, command]);
+  const addMessage = (sender: string, content: string) => setMessages((prev) => [...prev, { sender, content, timestamp: new Date().toISOString() }]);
+  const makeDecision = (optionId: string) => {/* Dummy */};
+  const showStory = (story: StoryPopup) => setCurrentStory(story);
+  const addChatMessage = (groupId: string, message: ChatMessage) => {/* Dummy */};
+  const completeMission = (missionId: string) => {/* Dummy */};
+  const addMoneyNotification = (amount: number, message: string) => {/* Dummy */};
+  const removeMoneyNotification = (id: string) => {/* Dummy */};
+  const testMoneyNotification = () => {/* Dummy */};
+  const getMission = (id: string) => missions.find(m => m.id === id);
+  const increaseAlarmLevel = (reason: string) => {/* Dummy */};
+  const resetAlarmLevel = () => {/* Dummy */};
+  const removeAlarmNotification = (id: string) => {/* Dummy */};
+  const resetGame = () => {/* Dummy */};
+  const updateBitcoinBalance = (amount: number, message?: string, skipBackend?: boolean) => {/* Dummy */};
 
   const checkGameProgress = useCallback(async (): Promise<boolean> => {
     console.log('checkGameProgress called, user:', user);
@@ -349,7 +504,22 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const value: GameContextType = {
+  const value: ExtendedGameContextType = {
+    currentView, setCurrentView,
+    day, incrementDay,
+    timeOfDay, toggleTimeOfDay,
+    gameTime,
+    bitcoinBalance, setBitcoinBalance, bitcoinRate, updateBitcoinBalance,
+    terminalHistory, addTerminalCommand,
+    messages, addMessage,
+    currentDecision, setCurrentDecision, playerDecisions, makeDecision,
+    currentStory, setCurrentStory, showStory,
+    chatGroups, currentChatGroup, setCurrentChatGroup, addChatMessage,
+    currentMission, setCurrentMission, completedMissions, completeMission,
+    moneyNotifications, addMoneyNotification, removeMoneyNotification, testMoneyNotification,
+    missions, getMission,
+    alarmLevel, increaseAlarmLevel, resetAlarmLevel, alarmNotifications, removeAlarmNotification,
+    isGameOver, resetGame,
     user,
     gameState,
     roomData,
@@ -380,4 +550,8 @@ export function useGame() {
     throw new Error('useGame must be used within a GameProvider');
   }
   return context;
+}
+
+export function useGameState() {
+  return useGame();
 } 

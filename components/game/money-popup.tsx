@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useGameState } from "./game-context"
+import { useGameState } from '@/lib/contexts/game-context'
 import { Bitcoin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { playSound } from "@/lib/sound-utils"
