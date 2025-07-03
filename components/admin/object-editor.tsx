@@ -580,7 +580,7 @@ export default function ObjectEditor({
             {!object.roomId ? (
               <div className="text-center py-8 text-gray-500">
                 <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Bitte wähle zuerst einen Raum aus dem "Allgemein"-Tab aus.</p>
+                <p>Bitte wähle zuerst einen Raum aus dem &quot;Allgemein&quot;-Tab aus.</p>
               </div>
             ) : (
               <>
