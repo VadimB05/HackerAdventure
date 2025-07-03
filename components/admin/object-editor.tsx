@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ import {
   Palette
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
+import { getUploadUrl } from '@/lib/utils';
 
 interface RoomObject {
   id: string;
@@ -149,6 +150,11 @@ export default function ObjectEditor({
 
   const [activeTab, setActiveTab] = useState('general');
 
+  // State für Drag-and-Drop
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (initialObject) {
@@ -379,6 +385,30 @@ export default function ObjectEditor({
     onSave?.(object);
   };
 
+  // Hole das Hintergrundbild des ausgewählten Raums
+  const selectedRoom = rooms.find(room => room.room_id === object.roomId);
+  const roomBackground = selectedRoom?.background_image;
+
+  // Dragging-Logik mit globalen Events
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMove = (e: MouseEvent) => {
+      if (!previewRef.current) return;
+      const rect = previewRef.current.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100 - dragStart.x;
+      const y = ((e.clientY - rect.top) / rect.height) * 100 - dragStart.y;
+      handleInputChange('x', Math.max(0, Math.min(100 - object.width, x)));
+      handleInputChange('y', Math.max(0, Math.min(100 - object.height, y)));
+    };
+    const handleUp = () => setIsDragging(false);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragging, dragStart, object.width, object.height]);
+
   return (
     <Card className="w-full max-w-6xl mx-auto">
       <CardHeader>
@@ -521,71 +551,118 @@ export default function ObjectEditor({
           </TabsContent>
 
           <TabsContent value="position" className="space-y-4">
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="x">X-Position (%)</Label>
-                <Input
-                  id="x"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={object.x}
-                  onChange={(e) => handleInputChange('x', Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
-                />
+            {!object.roomId ? (
+              <div className="text-center py-8 text-gray-500">
+                <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Bitte wähle zuerst einen Raum aus dem "Allgemein"-Tab aus.</p>
               </div>
-              <div>
-                <Label htmlFor="y">Y-Position (%)</Label>
-                <Input
-                  id="y"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={object.y}
-                  onChange={(e) => handleInputChange('y', Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="width">Breite (%)</Label>
-                <Input
-                  id="width"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={object.width}
-                  onChange={(e) => handleInputChange('width', Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="height">Höhe (%)</Label>
-                <Input
-                  id="height"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={object.height}
-                  onChange={(e) => handleInputChange('height', Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                />
-              </div>
-            </div>
-
-            <div className="border-2 border-gray-300 rounded-lg p-4 bg-gray-50">
-              <div className="text-sm font-medium mb-2">Vorschau der Position:</div>
-              <div className="relative w-full h-32 bg-white border border-gray-200 rounded">
-                <div
-                  className="absolute bg-blue-500 bg-opacity-50 border border-blue-600"
-                  style={{
-                    left: `${object.x}%`,
-                    top: `${object.y}%`,
-                    width: `${object.width}%`,
-                    height: `${object.height}%`,
-                  }}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">
-                    {object.name || 'Objekt'}
+            ) : (
+              <>
+                <div className="grid grid-cols-4 gap-4">
+                  <div>
+                    <Label htmlFor="x">X-Position (%)</Label>
+                    <Input
+                      id="x"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={object.x}
+                      onChange={(e) => handleInputChange('x', Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="y">Y-Position (%)</Label>
+                    <Input
+                      id="y"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={object.y}
+                      onChange={(e) => handleInputChange('y', Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="width">Breite (%)</Label>
+                    <Input
+                      id="width"
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={object.width}
+                      onChange={(e) => handleInputChange('width', Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="height">Höhe (%)</Label>
+                    <Input
+                      id="height"
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={object.height}
+                      onChange={(e) => handleInputChange('height', Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
+
+                <div className="border-2 border-gray-300 rounded-lg p-4 bg-gray-50">
+                  <div className="text-sm font-medium mb-2">
+                    Vorschau der Position: {selectedRoom?.name}
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    Klicke und ziehe das blaue Objekt, um es zu positionieren
+                  </div>
+                  <div 
+                    ref={previewRef}
+                    className="relative w-full h-64 bg-white border border-gray-200 rounded overflow-hidden select-none"
+                    style={{
+                      backgroundImage: roomBackground ? `url(${getUploadUrl(roomBackground)})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {!roomBackground && (
+                      <div className="absolute inset-0 flex items-center justify-center text-gray-400 select-none">
+                        <div className="text-center">
+                          <MapPin className="h-8 w-8 mx-auto mb-2" />
+                          <p className="text-sm">Kein Hintergrundbild für diesen Raum</p>
+                        </div>
+                      </div>
+                    )}
+                    <div
+                      className={`absolute bg-blue-500 bg-opacity-50 border-2 border-blue-600 cursor-move transition-all select-none ${
+                        isDragging ? 'scale-105 shadow-lg' : 'hover:scale-105'
+                      }`}
+                      style={{
+                        left: `${object.x}%`,
+                        top: `${object.y}%`,
+                        width: `${object.width}%`,
+                        height: `${object.height}%`,
+                        userSelect: 'none',
+                      }}
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const rect = previewRef.current!.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        setDragStart({
+                          x: x - object.x,
+                          y: y - object.y
+                        });
+                        setIsDragging(true);
+                      }}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold select-none">
+                        {object.name || 'Objekt'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="type" className="space-y-4">
