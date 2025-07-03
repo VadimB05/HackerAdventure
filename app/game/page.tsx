@@ -1,7 +1,7 @@
 "use client";
 
 import GameLayout from "@/components/game/game-layout"
-import { GameProvider } from "@/components/game/game-context"
+import { GameProvider } from '@/lib/contexts/game-context'
 import IntroStory from "@/components/game/intro-story"
 import { useSearchParams } from 'next/navigation'
 import { useState, useEffect, Suspense } from 'react'

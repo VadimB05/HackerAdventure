@@ -71,7 +71,6 @@ interface GameContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   startNewGame: () => Promise<void>;
-  continueGame: () => Promise<void>;
   checkGameProgress: () => Promise<boolean>;
   loadRoomData: (roomId: string) => Promise<{
     room: any;
@@ -179,7 +178,23 @@ interface ExtendedGameContextType extends GameContextType {
 
 const GameContext = createContext<ExtendedGameContextType | undefined>(undefined);
 
-export function GameProvider({ children }: { children: React.ReactNode }) {
+export function GameProvider({
+  children,
+  continueGame = false,
+  initialRoom = "intro",
+  initialBitcoins = 0,
+  initialExp = 0,
+  initialLevel = 1,
+  initialMission = null
+}: {
+  children: React.ReactNode;
+  continueGame?: boolean;
+  initialRoom?: string;
+  initialBitcoins?: number;
+  initialExp?: number;
+  initialLevel?: number;
+  initialMission?: string | null;
+}) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -431,25 +446,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const continueGame = async (): Promise<void> => {
-    if (hasGameProgress && gameState) {
-      // Spielstandsdaten als URL-Parameter übergeben
-      const params = new URLSearchParams({
-        continue: 'true',
-        room: gameState.currentRoom,
-        bitcoins: gameState.bitcoins.toString(),
-        exp: gameState.experiencePoints.toString(),
-        level: gameState.level.toString()
-      });
-      
-      if (gameState.currentMission) {
-        params.append('mission', gameState.currentMission);
-      }
-      
-      router.push(`/game?${params.toString()}`);
-    }
-  };
-
   const loadRoomData = async (roomId: string): Promise<{
     room: any;
     puzzles: any[];
@@ -507,7 +503,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     startNewGame,
-    continueGame,
     checkGameProgress,
     loadRoomData
   };
