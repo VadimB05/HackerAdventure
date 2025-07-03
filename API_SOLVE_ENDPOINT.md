@@ -2,7 +2,7 @@
 
 ## POST /api/game/solve
 
-Ein universeller Endpunkt zum Lösen von Rätseln aller Typen. Der Endpunkt validiert die Antwort basierend auf dem Rätseltyp und aktualisiert den Spielerfortschritt entsprechend.
+Ein universeller Endpunkt zum Lösen von Rätseln aller Typen. Der Endpunkt validiert die Antwort basierend auf dem Rätseltyp und aktualisiert den Spielerfortschritt entsprechend. Das System erhöht das Alarm-Level, wenn die maximal erlaubten Fehlversuche erreicht werden, und setzt die Versuche für dieses Puzzle serverseitig zurück.
 
 ## Authentifizierung
 
@@ -81,6 +81,7 @@ interface SolveResponse {
   rewardItems?: string[];
   unlockedRooms?: string[];
   unlockedItems?: string[];
+  alarmLevelIncreased?: false;
 }
 ```
 
@@ -93,11 +94,12 @@ interface SolveResponse {
   "message": "Rätsel erfolgreich gelöst!",
   "rewardExp": 150,
   "rewardBitcoins": 0.025,
-  "rewardItems": ["key_1", "tool_1"]
+  "rewardItems": ["key_1", "tool_1"],
+  "alarmLevelIncreased": false
 }
 ```
 
-### Falsche Antwort
+### Falsche Antwort (noch nicht max. Fehlversuche)
 
 ```typescript
 interface SolveResponse {
@@ -106,6 +108,7 @@ interface SolveResponse {
   attempts: number;
   message: string;
   hints?: string[];
+  alarmLevelIncreased?: false;
 }
 ```
 
@@ -116,9 +119,42 @@ interface SolveResponse {
   "isCorrect": false,
   "attempts": 3,
   "message": "Falsche Antwort. Versuche es nochmal!",
-  "hints": ["Der Befehl beginnt mit 'ssh'"]
+  "hints": ["Der Befehl beginnt mit 'ssh'"],
+  "alarmLevelIncreased": false
 }
 ```
+
+### Falsche Antwort (max. Fehlversuche erreicht, Alarm-Level steigt)
+
+```typescript
+interface SolveResponse {
+  success: false;
+  isCorrect: false;
+  attempts: number;
+  message: string;
+  alarmLevelIncreased: true;
+  newAlarmLevel: number;
+  attemptsReset: true;
+}
+```
+
+**Beispiel:**
+```json
+{
+  "success": false,
+  "isCorrect": false,
+  "attempts": 5,
+  "message": "Maximale Fehlversuche erreicht. Alarm-Level wurde erhöht!",
+  "alarmLevelIncreased": true,
+  "newAlarmLevel": 2,
+  "attemptsReset": true
+}
+```
+
+- Das Feld `alarmLevelIncreased` zeigt an, ob das Alarm-Level nach dieser Aktion gestiegen ist.
+- Nach einem Alarm-Level-Anstieg werden die Fehlversuche für dieses Puzzle serverseitig zurückgesetzt.
+- Im Frontend erscheint ein zentrales, rotes Notify: **"Dein Alarm Level ist gestiegen!"**
+- Die Verwaltung läuft über `puzzle_progress` und `player_stats`.
 
 ### Fehler
 
@@ -206,6 +242,9 @@ const solvePuzzle = async (puzzleId: string, answer: string) => {
   if (result.success && result.isCorrect) {
     // Rätsel gelöst - Belohnungen anzeigen
     showRewards(result.rewardExp, result.rewardBitcoins);
+  } else if (result.alarmLevelIncreased) {
+    // Alarm-Level gestiegen - Notify anzeigen
+    showAlarmNotify();
   } else {
     // Falsche Antwort - Hinweise anzeigen
     showHints(result.hints);

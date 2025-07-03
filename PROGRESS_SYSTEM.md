@@ -8,42 +8,42 @@ Das Spielfortschritt-System verwaltet den Fortschritt der Spieler durch das Spie
 
 ### Datenbank-Tabellen
 
-- **`puzzle_progress`**: Fortschritt bei einzelnen Rätseln
-- **`mission_progress`**: Fortschritt bei Missionen
-- **`room_visits`**: Tracking von Raum-Besuchen
-- **`player_stats`**: Gesamtstatistiken des Spielers
-- **`game_states`**: Aktueller Spieler-Status
+- **`puzzle_progress`**: Speichert Versuche, Lösungen und Bestzeiten für einzelne Rätsel
+- **`mission_progress`**: Speichert den Abschluss und Fortschritt von Missionen
+- **`room_visits`**: Zeichnet besuchte Räume auf
+- **`player_stats`**: Hält Gesamtstatistiken des Spielers (z.B. XP, Level, Alarm-Level)
+- **`game_states`**: Speichert den aktuellen Status des Spielers
 
 ### Services
 
-- **`ProgressService`**: Frontend-Service für Fortschritt-Operationen
-- **API-Routen**: Backend-Endpoints für Fortschritt-Verwaltung
+- **`ProgressService`**: Frontend-Service für Fortschritts-Operationen
+- **API-Routen**: Backend-Endpunkte für Fortschritts-Verwaltung
 
 ## Features
 
 ### Rätsel-Fortschritt
-- ✅ Speichern von Versuchen und Lösungen
-- ✅ Tracking von Bestzeiten
-- ✅ Hinweise-Verwendung
-- ✅ Automatische Belohnungen (XP, Bitcoins)
-- ✅ Level-Up-System
+- Speichert Versuche und Lösungen
+- Trackt Bestzeiten
+- Vermerkt Hinweise-Verwendung
+- Vergibt automatisch Belohnungen (XP, Bitcoins, Items)
+- Level-Up-System
 
 ### Mission-Fortschritt
-- ✅ Mission-Abschluss-Tracking
-- ✅ Rätsel- und Raum-Listen pro Mission
-- ✅ Mission-spezifische Belohnungen
-- ✅ Automatische Statistiken-Updates
+- Trackt abgeschlossene Missionen
+- Listet Rätsel und Räume pro Mission
+- Vergibt mission-spezifische Belohnungen
+- Aktualisiert automatisch Statistiken
 
 ### Raum-System
-- ✅ Raum-Wechsel mit Fortschritt-Speicherung
-- ✅ Mission-gebundene Räume
-- ✅ Level-Anforderungen
-- ✅ Raum-Besuch-Tracking
+- Speichert Raum-Wechsel und Fortschritt
+- Unterstützt mission-gebundene Räume
+- Berücksichtigt Level-Anforderungen
+- Trackt Raum-Besuche
 
 ### Item-System
-- ✅ Inventar-Verwaltung
-- ✅ Item-Verwendung mit Fortschritt-Updates
-- ✅ Item-spezifische Effekte
+- Verwalten des Inventars
+- Item-Verwendung mit Fortschritts-Updates
+- Item-spezifische Effekte
 
 ## API-Endpoints
 
@@ -181,27 +181,27 @@ Level = Math.floor(experiencePoints / 100) + 1
 
 ## Sicherheit
 
-- ✅ Authentifizierung erforderlich (TODO: implementieren)
-- ✅ SQL-Injection-Schutz
-- ✅ Validierung aller Eingaben
-- ✅ Transaktionale Updates
+- Authentifizierung erforderlich
+- SQL-Injection-Schutz
+- Validierung aller Eingaben
+- Transaktionale Updates
 
 ## Performance
 
-- ✅ Indizierte Datenbankabfragen
-- ✅ Effiziente Joins
-- ✅ Caching-Möglichkeiten
-- ✅ Batch-Updates für Statistiken
+- Indizierte Datenbankabfragen
+- Effiziente Joins
+- Caching-Möglichkeiten
+- Batch-Updates für Statistiken
 
 ## Erweiterte Features (Zukunft)
 
-- [ ] Achievement-System
-- [ ] Leaderboards
-- [ ] Spieler-Ranglisten
-- [ ] Statistiken-Export
-- [ ] Fortschritt-Backup
-- [ ] Multiplayer-Fortschritt
-- [ ] Cloud-Synchronisation
+- Achievement-System
+- Leaderboards
+- Spieler-Ranglisten
+- Statistiken-Export
+- Fortschritt-Backup
+- Multiplayer-Fortschritt
+- Cloud-Synchronisation
 
 ## Debugging
 
@@ -217,8 +217,6 @@ POST /api/debug/progress/reset?userId=1
 - Performance-Metriken verfügbar
 
 ## Migration
-
-Das System ist rückwärtskompatibel und kann schrittweise eingeführt werden:
 
 1. Datenbank-Tabellen erstellen
 2. Services implementieren

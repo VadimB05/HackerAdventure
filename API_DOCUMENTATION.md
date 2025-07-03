@@ -10,6 +10,92 @@ Die API ist in drei Hauptbereiche unterteilt:
 - **🎮 Game API** (`/api/game/*`) - Spiel-Funktionen und -Daten
 - **🛠️ Admin API** (`/api/admin/*`) - Editor-Funktionen und Verwaltung
 
+## 🎮 Game API – Alarm-Level und Puzzle-Logik
+
+Das Alarm-Level-System erhöht das Alarm-Level eines Spielers, wenn bei einem Puzzle die maximal erlaubten Fehlversuche erreicht werden. Nach dem Anstieg werden die Versuche für dieses Puzzle serverseitig auf 0 zurückgesetzt. Die Verwaltung erfolgt über die Tabellen `puzzle_progress` und `player_stats`. Die Alarm-UX ist ein zentrales Notify (rot), das mittig angezeigt wird. Die gesamte Logik ist serverseitig und manipulationssicher.
+
+### Rätsel lösen
+```http
+POST /api/game/puzzles/solve
+Content-Type: application/json
+Authorization: Bearer jwt_token_here
+
+{
+  "puzzleId": "terminal_puzzle_1",
+  "answer": "hack system"
+}
+```
+
+**Response (bei korrekter Lösung):**
+```json
+{
+  "success": true,
+  "message": "Rätsel erfolgreich gelöst!",
+  "puzzleId": "terminal_puzzle_1",
+  "reward": {
+    "money": 50,
+    "experience": 25,
+    "items": ["usb_stick"]
+  },
+  "alarmLevelIncreased": false
+}
+```
+
+**Response (bei falscher Lösung, aber noch nicht max. Fehlversuche):**
+```json
+{
+  "success": false,
+  "message": "Antwort ist falsch. Versuche es erneut!",
+  "puzzleId": "terminal_puzzle_1",
+  "attemptsLeft": 1,
+  "alarmLevelIncreased": false
+}
+```
+
+**Response (bei max. Fehlversuchen, Alarm-Level steigt):**
+```json
+{
+  "success": false,
+  "message": "Maximale Fehlversuche erreicht. Alarm-Level wurde erhöht!",
+  "puzzleId": "terminal_puzzle_1",
+  "alarmLevelIncreased": true,
+  "newAlarmLevel": 2,
+  "attemptsReset": true
+}
+```
+
+- Das Feld `alarmLevelIncreased` zeigt an, ob das Alarm-Level nach dieser Aktion gestiegen ist.
+- Nach einem Alarm-Level-Anstieg werden die Fehlversuche für dieses Puzzle serverseitig zurückgesetzt.
+- Im Frontend erscheint ein zentrales, rotes Notify: **"Dein Alarm Level ist gestiegen!"**
+- Die Verwaltung läuft ausschließlich über `puzzle_progress` und `player_stats`.
+
+### Spielstand abrufen
+```http
+GET /api/game/state
+Authorization: Bearer jwt_token_here
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "gameState": {
+    "currentRoom": "basement",
+    "money": 150.00,
+    "experiencePoints": 75,
+    "level": 2,
+    "alarmLevel": 2,
+    "inventory": ["laptop", "usb_stick"],
+    "progress": {
+      "basement": { "completed": true },
+      "city_view": { "completed": false }
+    }
+  }
+}
+```
+
+- Das Feld `alarmLevel` gibt das aktuelle Alarm-Level des Spielers an.
+
 ## 🔐 Auth API
 
 ### Health Check
@@ -102,199 +188,6 @@ POST /api/auth/logout
 {
   "success": true,
   "message": "Erfolgreich abgemeldet"
-}
-```
-
-## 🎮 Game API
-
-### Health Check
-```http
-GET /api/game/health
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Game API ist erreichbar",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "status": "healthy",
-  "version": "1.0.0"
-}
-```
-
-### Spielstand abrufen
-```http
-GET /api/game/state
-Authorization: Bearer jwt_token_here
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "gameState": {
-    "currentRoom": "basement",
-    "money": 150.00,
-    "experiencePoints": 75,
-    "level": 2,
-    "inventory": ["laptop", "usb_stick"],
-    "progress": {
-      "basement": { "completed": true },
-      "city_view": { "completed": false }
-    }
-  }
-}
-```
-
-### Alle Räume abrufen
-```http
-GET /api/game/rooms
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "rooms": [
-    {
-      "id": "intro",
-      "name": "Einführung",
-      "description": "Willkommen in der Welt des ethischen Hackings",
-      "isLocked": false,
-      "requiredLevel": 1
-    },
-    {
-      "id": "basement",
-      "name": "Keller",
-      "description": "Ein dunkler Keller mit alten Computern",
-      "isLocked": false,
-      "requiredLevel": 1
-    }
-  ],
-  "count": 2
-}
-```
-
-### Spezifischen Raum abrufen
-```http
-GET /api/game/rooms/basement
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "room": {
-    "id": "basement",
-    "name": "Keller",
-    "description": "Ein dunkler Keller mit alten Computern",
-    "backgroundImage": "/images/rooms/basement.jpg",
-    "isLocked": false,
-    "requiredLevel": 1,
-    "objects": [
-      { "id": "computer", "type": "interactive", "position": { "x": 100, "y": 200 } }
-    ],
-    "puzzles": [
-      { "id": "puzzle_1", "type": "terminal", "isCompleted": false }
-    ]
-  }
-}
-```
-
-### Alle Rätsel abrufen
-```http
-GET /api/game/puzzles
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "puzzles": [
-    {
-      "id": "terminal_puzzle_1",
-      "name": "Terminal-Hack",
-      "type": "terminal",
-      "difficulty": 1,
-      "roomId": "basement",
-      "isCompleted": false
-    }
-  ],
-  "count": 1
-}
-```
-
-### Rätsel lösen
-```http
-POST /api/game/puzzles/solve
-Content-Type: application/json
-Authorization: Bearer jwt_token_here
-
-{
-  "puzzleId": "terminal_puzzle_1",
-  "answer": "hack system"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Rätsel erfolgreich gelöst!",
-  "puzzleId": "terminal_puzzle_1",
-  "reward": {
-    "money": 50,
-    "experience": 25,
-    "items": ["usb_stick"]
-  }
-}
-```
-
-### Inventar abrufen
-```http
-GET /api/game/inventory
-Authorization: Bearer jwt_token_here
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "inventory": [
-    {
-      "id": "laptop",
-      "name": "Laptop",
-      "type": "tool",
-      "quantity": 1,
-      "description": "Ein alter aber funktionsfähiger Laptop"
-    }
-  ],
-  "count": 1
-}
-```
-
-### Item zum Inventar hinzufügen
-```http
-POST /api/game/inventory
-Content-Type: application/json
-Authorization: Bearer jwt_token_here
-
-{
-  "itemId": "usb_stick",
-  "quantity": 1
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Item usb_stick erfolgreich hinzugefügt",
-  "item": {
-    "id": "usb_stick",
-    "quantity": 1
-  }
 }
 ```
 

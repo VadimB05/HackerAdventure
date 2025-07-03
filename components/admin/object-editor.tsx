@@ -28,7 +28,8 @@ import {
   Unlink,
   Move,
   Settings,
-  Palette
+  Palette,
+  AlertTriangle
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { getUploadUrl } from '@/lib/utils';
@@ -156,11 +157,21 @@ export default function ObjectEditor({
 
   const previewRef = useRef<HTMLDivElement>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (initialObject) {
       setObject(initialObject);
     }
   }, [initialObject]);
+
+  // Fehler nach 5 Sekunden automatisch ausblenden
+  useEffect(() => {
+    if (error) {
+      const timeout = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [error]);
 
   const handleInputChange = (field: keyof RoomObject, value: any) => {
     setObject(prev => ({ ...prev, [field]: value }));
@@ -376,13 +387,22 @@ export default function ObjectEditor({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!object.name || !object.roomId) {
-      alert('Name und Raum sind erforderlich!');
+      setError('Bitte fülle alle Pflichtfelder aus.');
       return;
     }
-
-    onSave?.(object);
+    try {
+      await onSave?.(object);
+    } catch (e: any) {
+      if (e?.response?.status === 409) {
+        setError('Fehler: Die Objekt-ID ist bereits vergeben. Bitte wähle eine andere ID.');
+      } else if (e?.response?.status === 400) {
+        setError('Fehler: Bitte fülle alle Pflichtfelder korrekt aus.');
+      } else {
+        setError('Unbekannter Fehler beim Speichern.');
+      }
+    }
   };
 
   // Hole das Hintergrundbild des ausgewählten Raums
@@ -411,6 +431,12 @@ export default function ObjectEditor({
 
   return (
     <Card className="w-full max-w-6xl mx-auto">
+      {error && (
+        <div className="bg-red-600 text-white flex items-center gap-2 px-4 py-2 rounded-t-md">
+          <AlertTriangle className="w-5 h-5" />
+          <span>{error}</span>
+        </div>
+      )}
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MapPin className="h-5 w-5" />
@@ -506,7 +532,7 @@ export default function ObjectEditor({
                   </SelectTrigger>
                   <SelectContent>
                     {ICON_OPTIONS.map(icon => {
-                      const IconComponent = LucideIcons[icon] as React.ElementType;
+                      const IconComponent = LucideIcons[icon as keyof typeof LucideIcons] as React.ElementType;
                       return (
                         <SelectItem key={icon} value={icon}>
                           <div className="flex items-center gap-2">

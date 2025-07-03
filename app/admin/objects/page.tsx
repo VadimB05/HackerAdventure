@@ -78,7 +78,8 @@ export default function ObjectsPage() {
   const [positioningObject, setPositioningObject] = useState<RoomObject | null>(null);
   const [roomBackground, setRoomBackground] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const previewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Objekte laden
@@ -180,7 +181,8 @@ export default function ObjectsPage() {
   const handlePosition = (object: RoomObject) => {
     setPositioningObject(object);
     setSelectedRoom(object.roomId);
-    setRoomBackground(object.roomName);
+    const room = rooms.find(r => r.room_id === object.roomId);
+    setRoomBackground(room?.background_image || '');
     setShowPositionEditor(true);
   };
 
@@ -203,7 +205,15 @@ export default function ObjectsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Fehler beim Speichern des Objekts');
+        // Fehlertext auslesen, falls vorhanden
+        let message = 'Fehler beim Speichern des Objekts';
+        try {
+          const data = await response.json();
+          if (data?.error) message = data.error;
+        } catch {}
+        const error: any = new Error(message);
+        error.response = response;
+        throw error;
       }
 
       await loadObjects();
@@ -211,7 +221,8 @@ export default function ObjectsPage() {
       setShowEditModal(false);
       setEditingObject(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Speichern');
+      // Fehler an den Editor weitergeben
+      throw err;
     }
   };
 
@@ -287,6 +298,29 @@ export default function ObjectsPage() {
       </Badge>
     );
   };
+
+  // Dragging-Logik für Position-Editor
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMove = (e: MouseEvent) => {
+      if (!previewRef.current || !positioningObject) return;
+      const rect = previewRef.current.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100 - dragStart.x;
+      const y = ((e.clientY - rect.top) / rect.height) * 100 - dragStart.y;
+      setPositioningObject(obj => obj ? ({
+        ...obj,
+        x: Math.max(0, Math.min(100 - obj.width, x)),
+        y: Math.max(0, Math.min(100 - obj.height, y)),
+      }) : obj);
+    };
+    const handleUp = () => setIsDragging(false);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragging, dragStart, positioningObject]);
 
   if (loading) {
     return (
@@ -367,13 +401,6 @@ export default function ObjectsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Fehler */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       {/* Objekte-Tabelle */}
       <Card>
@@ -530,7 +557,11 @@ export default function ObjectsPage() {
                 Größe: {positioningObject.width}% × {positioningObject.height}%
               </div>
               
-              <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden" style={{ height: '400px' }}>
+              <div 
+                ref={previewRef}
+                className="relative border-2 border-gray-300 rounded-lg overflow-hidden select-none"
+                style={{ height: '400px', userSelect: 'none' }}
+              >
                 {/* Raum-Hintergrund */}
                 <div 
                   className="absolute inset-0 bg-gray-100 flex items-center justify-center"
@@ -547,25 +578,30 @@ export default function ObjectsPage() {
 
                 {/* Positionierbares Objekt */}
                 <div
-                  className="absolute bg-blue-500 bg-opacity-50 border-2 border-blue-600 cursor-move"
+                  className={`absolute bg-blue-500 bg-opacity-50 border-2 border-blue-600 cursor-move transition-all select-none ${
+                    isDragging ? 'scale-105 shadow-lg' : 'hover:scale-105'
+                  }`}
                   style={{
                     left: `${positioningObject.x}%`,
                     top: `${positioningObject.y}%`,
                     width: `${positioningObject.width}%`,
                     height: `${positioningObject.height}%`,
+                    userSelect: 'none',
                   }}
-                  onMouseDown={(e) => {
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = previewRef.current!.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    setDragStart({
+                      x: x - positioningObject.x,
+                      y: y - positioningObject.y
+                    });
                     setIsDragging(true);
-                    const rect = e.currentTarget.parentElement?.getBoundingClientRect();
-                    if (rect) {
-                      setDragPosition({
-                        x: e.clientX - rect.left,
-                        y: e.clientY - rect.top
-                      });
-                    }
                   }}
                 >
-                  <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold">
+                  <div className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold select-none">
                     {positioningObject.name}
                   </div>
                 </div>
